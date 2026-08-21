@@ -4,7 +4,6 @@ import { BUILTIN_NODE_TYPES } from '../../constants/nodeTypes';
 import { useGraphStore } from '../../store/useGraphStore';
 import { DynamicIcon } from '../common/DynamicIcon';
 import { snapToGrid } from '../../utils/geometry';
-import { GitFork, CornerDownRight, ArrowUpRight } from 'lucide-react';
 
 interface NodeCardProps {
   node: UPGNode;
@@ -29,13 +28,11 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     drillIntoNode,
     isSnapToGrid,
     transform,
-    graphs,
     edges,
   } = useGraphStore();
 
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
 
   const dragStartRef = useRef<{ startX: number; startY: number; initialNodeX: number; initialNodeY: number }>({
     startX: 0,
@@ -47,20 +44,15 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   const resizeStartRef = useRef<{ startX: number; startY: number; initialW: number; initialH: number }>({
     startX: 0,
     startY: 0,
-    initialW: 210,
-    initialH: 110,
+    initialW: 264,
+    initialH: 100,
   });
 
   // Calculate dependency / edge count
-  const incomingCount = Object.values(edges).filter((e) => e.targetNodeId === node.id).length;
-  const outgoingCount = Object.values(edges).filter((e) => e.sourceNodeId === node.id).length;
+  const depCount = Object.values(edges).filter((e) => e.sourceNodeId === node.id || e.targetNodeId === node.id).length;
 
-  // Sub-graph information
-  const subGraph = node.subGraphId ? graphs[node.subGraphId] : null;
-  const subGraphNodeCount = subGraph ? subGraph.nodeIds.length : 0;
-
-  const nodeWidth = node.size?.width || 210;
-  const nodeHeight = node.size?.height || 110;
+  const nodeWidth = node.size?.width || 264;
+  const nodeHeight = node.size?.height || 100;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.handle') || (e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('.resize-handle')) {
@@ -131,8 +123,8 @@ export const NodeCard: React.FC<NodeCardProps> = ({
       const dx = (e.clientX - resizeStartRef.current.startX) / transform.zoom;
       const dy = (e.clientY - resizeStartRef.current.startY) / transform.zoom;
 
-      let newW = Math.max(180, resizeStartRef.current.initialW + dx);
-      let newH = Math.max(90, resizeStartRef.current.initialH + dy);
+      let newW = Math.max(220, resizeStartRef.current.initialW + dx);
+      let newH = Math.max(88, resizeStartRef.current.initialH + dy);
 
       if (isSnapToGrid) {
         newW = snapToGrid(newW);
@@ -193,50 +185,37 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     }
   };
 
-  const getStatusDotBg = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
       case 'completed':
-        return '#09090b';
+      case 'stable':
+        return '#10b981';
       case 'in-progress':
-        return '#3f3f46';
-      case 'review':
-        return '#71717a';
+      case 'development':
+        return '#f59e0b';
       case 'blocked':
       case 'deprecated':
-        return '#a1a1aa';
+        return '#ef4444';
       default:
-        return '#d4d4d8';
+        return '#9ca3af';
     }
   };
+
+  const statusColor = getStatusColor(node.status);
 
   return (
     <div
       id={`node-${node.id}`}
+      className={`node ${isSelected ? 'selected' : ''}`}
       style={{
-        position: 'absolute',
         left: `${node.position.x}px`,
         top: `${node.position.y}px`,
         width: `${nodeWidth}px`,
-        height: `${nodeHeight}px`,
-        transform: 'translate3d(0, 0, 0)',
+        minHeight: `${nodeHeight}px`,
         zIndex: isSelected ? 20 : isDragging ? 19 : 10,
-        backgroundColor: '#ffffff',
-        borderRadius: '8px',
-        border: `1.5px solid ${isSelected ? '#09090b' : '#e4e4e7'}`,
-        boxShadow: isSelected
-          ? '0 0 0 2px #09090b, 0 12px 24px -4px rgba(0,0,0,0.18)'
-          : isHovered
-          ? '0 12px 20px -4px rgba(0,0,0,0.12)'
-          : '0 2px 6px -2px rgba(0,0,0,0.06)',
-        cursor: isDragging ? 'grabbing' : 'grab',
-        transition: isDragging || isResizing ? 'none' : 'box-shadow 0.15s ease, border-color 0.15s ease',
-        userSelect: 'none',
-        display: 'flex',
-        flexDirection: 'column',
+        position: 'absolute',
       }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onMouseDown={handleMouseDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -248,293 +227,168 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         onContextMenu(e, node.id);
       }}
     >
-      {/* Accent strip on top */}
-      <div
-        style={{
-          height: '3px',
-          width: '100%',
-          backgroundColor: '#09090b',
-          borderTopLeftRadius: '6px',
-          borderTopRightRadius: '6px',
-          flexShrink: 0,
-        }}
-      />
-
-      <div style={{ padding: '8px 10px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', overflow: 'hidden' }}>
-        {/* Top meta row */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '1px 5px',
-                borderRadius: '4px',
-                fontSize: '9.5px',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                backgroundColor: '#f4f4f5',
-                color: '#18181b',
-                border: '1px solid #e4e4e7',
-              }}
-            >
-              <DynamicIcon name={typeDef.icon || 'Box'} size={11} color="#18181b" />
-              <span>{typeDef.label}</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <div
-                title={`Status: ${node.status}`}
-                style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: getStatusDotBg(node.status),
-                  border: '1px solid #d4d4d8',
-                }}
-              />
-              <span style={{ fontSize: '9.5px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                {node.status}
-              </span>
-            </div>
-          </div>
-
-          {/* Node Name */}
+      <div>
+        {/* Header Row */}
+        <div className="node-header">
           <div
+            className="node-icon"
             style={{
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#09090b',
-              marginBottom: '2px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              backgroundColor: 'rgba(79, 70, 229, 0.08)',
+              color: 'var(--indigo)',
+              border: '1px solid rgba(79, 70, 229, 0.15)',
             }}
           >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {node.name}
-            </span>
-            {node.version && (
-              <span
-                style={{
-                  fontSize: '9px',
-                  fontWeight: 500,
-                  color: 'var(--text-subtle)',
-                  fontFamily: 'var(--font-mono)',
-                }}
-              >
-                v{node.version}
-              </span>
-            )}
+            <DynamicIcon name={typeDef.icon || 'Box'} size={14} color="var(--indigo)" />
           </div>
 
-          {/* Description */}
-          {node.description && (
-            <div
-              style={{
-                fontSize: '10.5px',
-                color: '#52525b',
-                lineHeight: '1.3',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: '-webkit-box',
-                WebkitLineClamp: Math.max(1, Math.floor((nodeHeight - 75) / 14)),
-                WebkitBoxOrient: 'vertical',
-              }}
-            >
-              {node.description}
+          <div className="node-title" title={node.name}>
+            {node.name}
+          </div>
+
+          {/* Status Dot */}
+          <div
+            title={`Status: ${node.status}`}
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: statusColor,
+              flexShrink: 0,
+            }}
+          />
+
+          {/* Subsystem child indicator */}
+          {node.subGraphId && (
+            <div className="child-ind" title="Contains nested subsystem (Double-click to dive)">
+              ↗
             </div>
           )}
         </div>
 
-        {/* Footer info: Connections & Nested Graph trigger */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingTop: '4px',
-            borderTop: '1px solid #f4f4f5',
-            fontSize: '9.5px',
-            color: 'var(--text-muted)',
-            marginTop: 'auto',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span title={`${incomingCount} incoming relations`} style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-              <CornerDownRight size={10} /> {incomingCount}
-            </span>
-            <span title={`${outgoingCount} outgoing relations`} style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-              <ArrowUpRight size={10} /> {outgoingCount}
-            </span>
-          </div>
-
-          {/* Sub-graph Drill Down Button */}
-          {node.subGraphId || subGraphNodeCount > 0 ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                drillIntoNode(node.id);
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '3px',
-                padding: '1px 5px',
-                borderRadius: '4px',
-                border: '1px solid #18181b',
-                backgroundColor: '#18181b',
-                color: '#ffffff',
-                fontSize: '9px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-              title="Drill into nested sub-graph"
-            >
-              <GitFork size={9} />
-              <span>Subsystem ({subGraphNodeCount})</span>
-            </button>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                drillIntoNode(node.id);
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px',
-                padding: '1px 4px',
-                borderRadius: '4px',
-                border: '1px solid #e4e4e7',
-                backgroundColor: '#f4f4f5',
-                color: '#3f3f46',
-                fontSize: '8.5px',
-                cursor: 'pointer',
-              }}
-              title="Create nested sub-graph"
-            >
-              <GitFork size={8} />
-              <span>Expand</span>
-            </button>
-          )}
+        {/* Description */}
+        <div className="node-desc">
+          {node.description || 'No description provided.'}
         </div>
       </div>
 
-      {/* Resize Handle (Bottom-Right corner) */}
+      {/* Footer */}
+      <div className="node-footer">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span className="tag type">{node.type}</span>
+          {node.priority === 'critical' && (
+            <span className="tag" style={{ background: '#fef2f2', color: '#e11d48', borderColor: '#fecdd3' }}>
+              critical
+            </span>
+          )}
+        </div>
+
+        <div style={{ fontSize: '11px', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+          ● {depCount} • v{node.version || '0.1.0'}
+        </div>
+      </div>
+
+      {/* Connection Handles (North, South, East, West) */}
+      <div className="handles">
+        <div
+          className="handle n"
+          title="Connect from Top"
+          onMouseDown={(e) => handleStartConnection(e, 'top')}
+          onMouseUp={(e) => handleMouseUpOnNode(e, 'top')}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: 0,
+            transform: 'translate(-50%, -50%)',
+            width: '10px',
+            height: '10px',
+            background: 'white',
+            border: '2px solid var(--indigo)',
+            borderRadius: '50%',
+            cursor: 'crosshair',
+            opacity: isSelected ? 1 : 0.85,
+          }}
+        />
+        <div
+          className="handle e"
+          title="Connect from Right"
+          onMouseDown={(e) => handleStartConnection(e, 'right')}
+          onMouseUp={(e) => handleMouseUpOnNode(e, 'right')}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '50%',
+            transform: 'translate(50%, -50%)',
+            width: '10px',
+            height: '10px',
+            background: 'white',
+            border: '2px solid var(--indigo)',
+            borderRadius: '50%',
+            cursor: 'crosshair',
+            opacity: isSelected ? 1 : 0.85,
+          }}
+        />
+        <div
+          className="handle s"
+          title="Connect from Bottom"
+          onMouseDown={(e) => handleStartConnection(e, 'bottom')}
+          onMouseUp={(e) => handleMouseUpOnNode(e, 'bottom')}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            bottom: 0,
+            transform: 'translate(-50%, 50%)',
+            width: '10px',
+            height: '10px',
+            background: 'white',
+            border: '2px solid var(--indigo)',
+            borderRadius: '50%',
+            cursor: 'crosshair',
+            opacity: isSelected ? 1 : 0.85,
+          }}
+        />
+        <div
+          className="handle w"
+          title="Connect from Left"
+          onMouseDown={(e) => handleStartConnection(e, 'left')}
+          onMouseUp={(e) => handleMouseUpOnNode(e, 'left')}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '10px',
+            height: '10px',
+            background: 'white',
+            border: '2px solid var(--indigo)',
+            borderRadius: '50%',
+            cursor: 'crosshair',
+            opacity: isSelected ? 1 : 0.85,
+          }}
+        />
+      </div>
+
+      {/* Resize Grip (Bottom-Right) */}
       <div
         className="resize-handle"
         onMouseDown={handleResizeMouseDown}
         style={{
           position: 'absolute',
-          right: '2px',
-          bottom: '2px',
-          width: '10px',
-          height: '10px',
+          right: '4px',
+          bottom: '4px',
+          width: '8px',
+          height: '8px',
           cursor: 'nwse-resize',
-          opacity: isHovered || isSelected ? 0.6 : 0,
+          opacity: isSelected ? 0.6 : 0.2,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 26,
         }}
-        title="Drag to resize node"
+        title="Resize node"
       >
         <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-          <path d="M5 1L1 5M5 3L3 5M5 5H5.01" stroke="#71717a" strokeWidth="1" strokeLinecap="round" />
+          <path d="M5 1L1 5M5 3L3 5M5 5H5.01" stroke="#9aa0ad" strokeWidth="1" strokeLinecap="round" />
         </svg>
       </div>
-
-      {/* Connection Handles (Top, Right, Bottom, Left) */}
-      <div
-        className="handle handle-top"
-        title="Connect from top"
-        onMouseDown={(e) => handleStartConnection(e, 'top')}
-        onMouseUp={(e) => handleMouseUpOnNode(e, 'top')}
-        style={{
-          position: 'absolute',
-          top: '-5px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '10px',
-          height: '10px',
-          borderRadius: '50%',
-          backgroundColor: '#ffffff',
-          border: '2px solid #09090b',
-          cursor: 'crosshair',
-          opacity: isHovered || isSelected ? 1 : 0,
-          transition: 'opacity 0.15s ease',
-          zIndex: 25,
-        }}
-      />
-
-      <div
-        className="handle handle-right"
-        title="Connect from right"
-        onMouseDown={(e) => handleStartConnection(e, 'right')}
-        onMouseUp={(e) => handleMouseUpOnNode(e, 'right')}
-        style={{
-          position: 'absolute',
-          top: '50%',
-          right: '-5px',
-          transform: 'translateY(-50%)',
-          width: '10px',
-          height: '10px',
-          borderRadius: '50%',
-          backgroundColor: '#ffffff',
-          border: '2px solid #09090b',
-          cursor: 'crosshair',
-          opacity: isHovered || isSelected ? 1 : 0,
-          transition: 'opacity 0.15s ease',
-          zIndex: 25,
-        }}
-      />
-
-      <div
-        className="handle handle-bottom"
-        title="Connect from bottom"
-        onMouseDown={(e) => handleStartConnection(e, 'bottom')}
-        onMouseUp={(e) => handleMouseUpOnNode(e, 'bottom')}
-        style={{
-          position: 'absolute',
-          bottom: '-5px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '10px',
-          height: '10px',
-          borderRadius: '50%',
-          backgroundColor: '#ffffff',
-          border: '2px solid #09090b',
-          cursor: 'crosshair',
-          opacity: isHovered || isSelected ? 1 : 0,
-          transition: 'opacity 0.15s ease',
-          zIndex: 25,
-        }}
-      />
-
-      <div
-        className="handle handle-left"
-        title="Connect from left"
-        onMouseDown={(e) => handleStartConnection(e, 'left')}
-        onMouseUp={(e) => handleMouseUpOnNode(e, 'left')}
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '-5px',
-          transform: 'translateY(-50%)',
-          width: '10px',
-          height: '10px',
-          borderRadius: '50%',
-          backgroundColor: '#ffffff',
-          border: '2px solid #09090b',
-          cursor: 'crosshair',
-          opacity: isHovered || isSelected ? 1 : 0,
-          transition: 'opacity 0.15s ease',
-          zIndex: 25,
-        }}
-      />
     </div>
   );
 };
