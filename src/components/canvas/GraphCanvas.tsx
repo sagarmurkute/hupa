@@ -6,9 +6,17 @@ import { NodeCard } from './NodeCard';
 import { GroupCard } from './GroupCard';
 import { EdgeRenderer } from './EdgeRenderer';
 import { Minimap } from './Minimap';
-import { CanvasControls } from './CanvasControls';
 import { calculateBezierPath } from '../../utils/geometry';
-import { Plus, Layers } from 'lucide-react';
+import {
+  MousePointer,
+  Hand,
+  Maximize2,
+  Sparkles,
+  Plus,
+  Layers,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 
 interface GraphCanvasProps {
   onNodeContextMenu: (e: React.MouseEvent, nodeId: string) => void;
@@ -33,6 +41,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     searchQuery,
     transform,
     setTransform,
+    zoomIn,
+    zoomOut,
+    zoomToFit,
     selectedNodeIds,
     selectedEdgeIds,
     selectedGroupIds,
@@ -45,8 +56,10 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     customNodeTypes,
     customRelationshipTypes,
     activeTool,
+    setActiveTool,
     setNewNodeModalOpen,
     setActiveView,
+    resetToTemplate,
   } = useGraphStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,7 +71,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const [isMarquee, setIsMarquee] = useState(false);
   const [marqueeBox, setMarqueeBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
 
-  // Track spacebar key for panning
+  // Track spacebar for panning
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
@@ -128,11 +141,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   // Filter edges
   const filteredEdges = Object.values(edges || {}).filter((edge) => {
     if (!edge || edge.graphId !== activeGraphId) return false;
-    // Both endpoints must be visible
     if (!filteredNodeIds.has(edge.sourceNodeId) || !filteredNodeIds.has(edge.targetNodeId)) {
       return false;
     }
-
     if (currentView && currentView.perspective !== 'all') {
       if (currentView.filterRelationshipTypes && currentView.filterRelationshipTypes.length > 0) {
         if (!currentView.filterRelationshipTypes.includes(edge.type)) {
@@ -140,14 +151,13 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         }
       }
     }
-
     return true;
   });
 
   // Filter groups
   const filteredGroups = Object.values(groups || {}).filter((g) => g && g.graphId === activeGraphId);
 
-  // Native Wheel & Trackpad Pinch Gesture with focal point zooming
+  // Native non-passive Wheel & Trackpad Pinch Gesture with focal point zooming
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -160,18 +170,15 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
       const currentTransform = useGraphStore.getState().transform;
 
-      // Check if pinch-to-zoom (ctrlKey) or standard wheel zoom
       if (e.ctrlKey || e.metaKey) {
-        // High-precision pinch zoom
+        // High-precision pinch-to-zoom
         const zoomDelta = -e.deltaY * 0.01;
         const newZoom = Math.max(0.15, Math.min(3.0, currentTransform.zoom * (1 + zoomDelta)));
         const newX = mouseX - (mouseX - currentTransform.x) * (newZoom / currentTransform.zoom);
         const newY = mouseY - (mouseY - currentTransform.y) * (newZoom / currentTransform.zoom);
         setTransform({ x: newX, y: newY, zoom: newZoom });
       } else {
-        // Standard mouse wheel zooming or 2-finger scroll
-        // If altKey is pressed or purely vertical delta with large magnitude -> Zoom
-        // Otherwise smooth zoom
+        // Standard wheel zooming
         const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
         const newZoom = Math.max(0.15, Math.min(3.0, currentTransform.zoom * zoomFactor));
         const newX = mouseX - (mouseX - currentTransform.x) * (newZoom / currentTransform.zoom);
@@ -241,8 +248,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
       const enclosedNodeIds = filteredNodes
         .filter((n) => {
-          const w = n.size?.width || 210;
-          const h = n.size?.height || 110;
+          const w = n.size?.width || 240;
+          const h = n.size?.height || 76;
           const nCenterX = n.position.x + w / 2;
           const nCenterY = n.position.y + h / 2;
           return nCenterX >= minX && nCenterX <= maxX && nCenterY >= minY && nCenterY <= maxY;
@@ -262,38 +269,12 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     }
   };
 
-  // Keyboard shortcut listener on canvas
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') {
-        return;
-      }
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const { selectedNodeIds, selectedEdgeIds, deleteNode, deleteEdge } = useGraphStore.getState();
-        selectedNodeIds.forEach((id) => deleteNode(id));
-        selectedEdgeIds.forEach((id) => deleteEdge(id));
-      } else if (e.key === 'f' || e.key === 'F') {
-        useGraphStore.getState().zoomToFit();
-      } else if (e.key === 'g' || e.key === 'G') {
-        useGraphStore.getState().toggleGrid();
-      } else if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
-        useGraphStore.getState().setShortcutsModalOpen(true);
-      } else if (e.key === 'Escape') {
-        useGraphStore.getState().clearSelection();
-        useGraphStore.getState().cancelPendingConnection();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   // Compute live pending connection line
   let pendingLinePath = '';
   if (pendingConnection && nodes[pendingConnection.sourceNodeId]) {
     const srcNode = nodes[pendingConnection.sourceNodeId];
-    const srcW = srcNode.size?.width || 210;
-    const srcH = srcNode.size?.height || 110;
+    const srcW = srcNode.size?.width || 240;
+    const srcH = srcNode.size?.height || 76;
     const p1 = {
       x:
         pendingConnection.sourceHandle === 'right'
@@ -317,7 +298,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`canvas-wrapper ${isGridVisible ? 'canvas-grid-dots' : ''}`}
+      className={`canvas-viewport ${isPanning || isSpacePressed ? 'is-panning' : ''}`}
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -327,21 +308,21 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           onCanvasContextMenu(e);
         }
       }}
-      style={{
-        cursor: isPanning || isSpacePressed ? 'grabbing' : pendingConnection ? 'crosshair' : 'default',
-      }}
     >
-      {/* Transformed Graph Container */}
+      {/* Precision Spatial Grid Matrix */}
+      {isGridVisible && <div className="canvas-grid-matrix" />}
+
+      {/* Infinite Transformed Coordinate Plane */}
       <div
+        className="canvas-plane"
         style={{
           transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
-          transformOrigin: '0 0',
           position: 'absolute',
           inset: 0,
           pointerEvents: 'none',
         }}
       >
-        {/* SVG Layer for Edges and Markers */}
+        {/* SVG Render Layer for Edges */}
         <svg
           style={{
             position: 'absolute',
@@ -381,10 +362,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 height={group.size.height}
                 style={{ overflow: 'visible' }}
               >
-                <GroupCard
-                  group={group}
-                  isSelected={selectedGroupIds.includes(group.id)}
-                />
+                <GroupCard group={group} isSelected={selectedGroupIds.includes(group.id)} />
               </foreignObject>
             ))}
 
@@ -407,15 +385,16 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               );
             })}
 
-            {/* Live Pending Connection Path */}
+            {/* Active Live Dragging Connection Curve */}
             {pendingConnection && (
               <path
                 d={pendingLinePath}
                 fill="none"
-                stroke="#0f172a"
+                stroke="#4f46e5"
                 strokeWidth={2}
-                strokeDasharray="6, 4"
-                style={{ animation: 'dashFlow 0.8s linear infinite' }}
+                strokeDasharray="4, 3"
+                markerEnd="url(#marker-uses)"
+                style={{ filter: 'drop-shadow(0 2px 6px rgba(79, 70, 229, 0.3))' }}
               />
             )}
 
@@ -425,8 +404,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 key={node.id}
                 x={node.position.x}
                 y={node.position.y}
-                width={node.size?.width || 210}
-                height={node.size?.height || 110}
+                width={node.size?.width || 240}
+                height={node.size?.height || 76}
                 style={{ overflow: 'visible' }}
               >
                 <NodeCard
@@ -440,7 +419,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           </g>
         </svg>
 
-        {/* Marquee Selection Rectangle */}
+        {/* Marquee Selection Bounding Box */}
         {isMarquee && marqueeBox && (
           <div
             style={{
@@ -449,85 +428,166 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               top: `${Math.min(marqueeBox.startY, marqueeBox.currentY)}px`,
               width: `${Math.abs(marqueeBox.currentX - marqueeBox.startX)}px`,
               height: `${Math.abs(marqueeBox.currentY - marqueeBox.startY)}px`,
-              border: '1.5px solid #0f172a',
-              backgroundColor: 'rgba(15, 23, 42, 0.05)',
-              borderRadius: '4px',
+              border: '1px solid #0f172a',
+              backgroundColor: 'rgba(15, 23, 42, 0.04)',
+              borderRadius: '3px',
               pointerEvents: 'none',
-              zIndex: 50,
+              zIndex: 60,
             }}
           />
         )}
       </div>
 
-      {/* Empty State Overlay when 0 nodes match current graph or view filter */}
+      {/* Blueprint Spatial Empty State */}
       {filteredNodes.length === 0 && (
         <div
           style={{
             position: 'absolute',
             inset: 0,
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             pointerEvents: 'none',
-            color: 'var(--text-muted)',
-            textAlign: 'center',
-            gap: '12px',
+            zIndex: 10,
           }}
         >
           <div
             style={{
-              padding: '24px 32px',
-              backgroundColor: 'rgba(255, 255, 255, 0.96)',
-              backdropFilter: 'blur(12px)',
-              borderRadius: '12px',
+              padding: '24px 30px',
+              backgroundColor: '#ffffff',
+              borderRadius: '10px',
               border: '1px solid var(--border-subtle)',
-              boxShadow: 'var(--shadow-md)',
+              boxShadow: 'var(--shadow-drawer)',
               pointerEvents: 'auto',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '12px',
-              maxWidth: '360px',
+              textAlign: 'center',
+              gap: '10px',
+              maxWidth: '340px',
             }}
           >
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {isPerspectiveFiltered
-                ? `No nodes in "${currentView?.name || 'Perspective'}"`
-                : 'Empty Graph Canvas'}
+              {isPerspectiveFiltered ? `Perspective: ${currentView?.name}` : 'Spatial Graph Canvas'}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
               {isPerspectiveFiltered
-                ? 'The active view perspective filtered out all nodes. Switch to Unified Graph or add relevant components.'
-                : 'Start designing your architecture by adding a node or applying a starter layout.'}
+                ? 'No architectural nodes match this perspective filter.'
+                : 'Represent and architect software systems by plotting nodes or deploying a starter template.'}
             </div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
               {isPerspectiveFiltered ? (
                 <button
                   onClick={() => setActiveView('view-all')}
-                  className="btn btn-primary"
-                  style={{ fontSize: '11px', padding: '5px 10px' }}
+                  className="hupa-btn primary"
                 >
-                  <Layers size={13} /> Switch to Unified View
+                  <Layers size={12} /> Switch to Unified View
                 </button>
               ) : (
-                <button
-                  onClick={() => setNewNodeModalOpen(true)}
-                  className="btn btn-primary"
-                  style={{ fontSize: '11px', padding: '5px 10px' }}
-                >
-                  <Plus size={13} /> Add First Node
-                </button>
+                <>
+                  <button
+                    onClick={() => setNewNodeModalOpen(true)}
+                    className="hupa-btn primary"
+                  >
+                    <Plus size={12} /> Add First Node
+                  </button>
+                  <button
+                    onClick={() => resetToTemplate('fullstack-web')}
+                    className="hupa-btn"
+                  >
+                    Deploy Fullstack Template
+                  </button>
+                </>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Floating Canvas Controls */}
-      <CanvasControls onAutoLayout={onAutoLayout} />
+      {/* Floating Contextual Tool Dock */}
+      <div className="floating-dock">
+        <button
+          onClick={() => setActiveTool('select')}
+          className={`hupa-btn ghost icon-only ${activeTool === 'select' ? 'primary' : ''}`}
+          title="Select Tool (V)"
+          style={{
+            backgroundColor: activeTool === 'select' ? '#0f172a' : 'transparent',
+            color: activeTool === 'select' ? '#ffffff' : 'var(--text-secondary)',
+          }}
+        >
+          <MousePointer size={13} />
+        </button>
 
-      {/* Minimap */}
+        <button
+          onClick={() => setActiveTool('pan')}
+          className={`hupa-btn ghost icon-only ${activeTool === 'pan' ? 'primary' : ''}`}
+          title="Pan Workspace (H or Space+Drag)"
+          style={{
+            backgroundColor: activeTool === 'pan' ? '#0f172a' : 'transparent',
+            color: activeTool === 'pan' ? '#ffffff' : 'var(--text-secondary)',
+          }}
+        >
+          <Hand size={13} />
+        </button>
+
+        <div className="dock-divider" />
+
+        <button
+          onClick={() => setNewNodeModalOpen(true)}
+          className="hupa-btn ghost"
+          title="Create Architectural Node (N)"
+        >
+          <Plus size={12} /> Node
+        </button>
+
+        <button
+          onClick={onAutoLayout}
+          className="hupa-btn ghost"
+          title="Compute Hierarchical DAG Auto-Layout"
+        >
+          <Sparkles size={12} color="var(--accent-indigo)" /> Auto-Layout
+        </button>
+
+        <div className="dock-divider" />
+
+        <button
+          onClick={() => zoomOut()}
+          className="hupa-btn ghost icon-only"
+          title="Zoom Out"
+        >
+          <ZoomOut size={13} />
+        </button>
+
+        <span
+          style={{
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono)',
+            padding: '0 4px',
+            color: 'var(--text-secondary)',
+            userSelect: 'none',
+          }}
+        >
+          {Math.round(transform.zoom * 100)}%
+        </span>
+
+        <button
+          onClick={() => zoomIn()}
+          className="hupa-btn ghost icon-only"
+          title="Zoom In"
+        >
+          <ZoomIn size={13} />
+        </button>
+
+        <button
+          onClick={() => zoomToFit()}
+          className="hupa-btn ghost icon-only"
+          title="Fit to Screen (F)"
+        >
+          <Maximize2 size={13} />
+        </button>
+      </div>
+
+      {/* Spatial Minimap */}
       <Minimap />
     </div>
   );

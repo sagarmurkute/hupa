@@ -2,17 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { BUILTIN_NODE_TYPES } from '../../constants/nodeTypes';
 import {
-  FolderGit2,
   ChevronRight,
   Search,
-  Sparkles,
-  Maximize2,
   Download,
-  Plus,
   Undo2,
   Redo2,
   HelpCircle,
   BarChart2,
+  FolderGit2,
 } from 'lucide-react';
 
 interface TopBarProps {
@@ -41,20 +38,15 @@ export const TopBar: React.FC<TopBarProps> = ({
     activeGraphId,
     selectNode,
     setTransform,
-    setNewNodeModalOpen,
-    zoomToFit,
     undo,
     redo,
     undoStack,
     redoStack,
-    updateMultipleNodePositions,
-    edges,
   } = useGraphStore();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Handle outside click to close search dropdown
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as HTMLElement)) {
@@ -65,50 +57,6 @@ export const TopBar: React.FC<TopBarProps> = ({
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
-  const handleAutoLayout = () => {
-    const currentNodes = Object.values(nodes).filter((n) => n.graphId === activeGraphId);
-    const currentEdges = Object.values(edges).filter((e) => e.graphId === activeGraphId);
-    
-    // Clean hierarchical layout
-    const indeg: Record<string, number> = {};
-    currentNodes.forEach((n) => (indeg[n.id] = 0));
-    currentEdges.forEach((e) => (indeg[e.targetNodeId] = (indeg[e.targetNodeId] || 0) + 1));
-
-    const layers: typeof currentNodes[] = [];
-    const placed = new Set<string>();
-    let cur = currentNodes.filter((n) => indeg[n.id] === 0);
-    if (cur.length === 0) cur = currentNodes.slice(0, 3);
-
-    while (cur.length > 0 && layers.length <= 10) {
-      layers.push(cur);
-      cur.forEach((n) => placed.add(n.id));
-      const next: typeof currentNodes = [];
-      cur.forEach((n) => {
-        currentEdges.forEach((e) => {
-          if (e.sourceNodeId === n.id && !placed.has(e.targetNodeId)) {
-            const nn = currentNodes.find((x) => x.id === e.targetNodeId);
-            if (nn && !next.some((x) => x.id === nn.id)) next.push(nn);
-          }
-        });
-      });
-      cur = next;
-    }
-
-    const unplaced = currentNodes.filter((n) => !placed.has(n.id));
-    if (unplaced.length > 0) layers.push(unplaced);
-
-    const newPositions: Record<string, { x: number; y: number }> = {};
-    layers.forEach((layer, li) => {
-      layer.forEach((n, ni) => {
-        newPositions[n.id] = { x: 80 + ni * 290, y: 80 + li * 170 };
-      });
-    });
-
-    updateMultipleNodePositions(newPositions);
-    setTimeout(() => zoomToFit(), 60);
-  };
-
-  // Search matches
   const searchResults = Object.values(nodes)
     .filter((n) => n.graphId === activeGraphId)
     .filter((n) => {
@@ -120,19 +68,19 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header className="topbar">
-      {/* Left: Brand, Project & Breadcrumbs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+      {/* Left: Spatial Navigation Hierarchy */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
         {/* Brand */}
-        <div className="logo" style={{ cursor: 'pointer' }} onClick={() => zoomToFit()}>
-          <div className="logo-mark">H</div>
+        <div className="logo-brand">
+          <div className="logo-badge">H</div>
           <span>HUPA</span>
         </div>
 
-        <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border)' }} />
+        <span style={{ color: 'var(--border-subtle)', margin: '0 2px' }}>/</span>
 
-        {/* Project Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <FolderGit2 size={15} color="var(--text2)" />
+        {/* Project Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <FolderGit2 size={13} color="var(--text-secondary)" />
           <select
             value={activeProjectId}
             onChange={(e) => {
@@ -143,16 +91,15 @@ export const TopBar: React.FC<TopBarProps> = ({
               }
             }}
             style={{
-              border: '1px solid var(--border)',
-              borderRadius: '7px',
-              padding: '3px 8px',
-              fontSize: '12.5px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              fontSize: '12px',
               fontWeight: 600,
-              color: 'var(--text)',
-              backgroundColor: 'var(--bg2)',
+              color: 'var(--text-primary)',
               cursor: 'pointer',
               outline: 'none',
-              maxWidth: '170px',
+              padding: '2px 4px',
+              borderRadius: '4px',
             }}
           >
             {Object.values(projects).map((p) => (
@@ -164,64 +111,77 @@ export const TopBar: React.FC<TopBarProps> = ({
           </select>
         </div>
 
-        <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border)' }} />
-
-        {/* Breadcrumb Navigation */}
-        <nav className="breadcrumbs">
-          {breadcrumbs.map((item, idx) => {
-            const isLast = idx === breadcrumbs.length - 1;
-            return (
-              <div key={item.graphId} className="crumb" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {idx > 0 && <ChevronRight size={12} color="var(--text3)" />}
-                <button
-                  onClick={() => navigateBreadcrumb(idx)}
-                  style={{
-                    fontWeight: isLast ? 600 : 400,
-                    color: isLast ? 'var(--text)' : 'var(--text2)',
-                    background: isLast ? 'var(--bg2)' : 'transparent',
-                  }}
-                  title={item.name}
-                >
-                  {item.name}
-                </button>
-              </div>
-            );
-          })}
-        </nav>
+        {/* Breadcrumb Path */}
+        {breadcrumbs.length > 1 && (
+          <nav className="breadcrumbs-spatial">
+            {breadcrumbs.map((item, idx) => {
+              const isLast = idx === breadcrumbs.length - 1;
+              return (
+                <div key={item.graphId} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ChevronRight size={11} color="var(--text-muted)" />
+                  <button
+                    onClick={() => navigateBreadcrumb(idx)}
+                    className={`breadcrumb-segment ${isLast ? 'current' : ''}`}
+                  >
+                    {item.name}
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
+        )}
       </div>
 
-      {/* Center: Global Search Bar */}
-      <div ref={searchContainerRef} className="search-wrap">
-        <span style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text3)' }}>
-          <Search size={14} />
-        </span>
-        <input
-          placeholder="Search nodes, types, tags… (⌘K)"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setIsSearchOpen(true);
+      {/* Center: Search & Command Palette Access */}
+      <div ref={searchContainerRef} style={{ position: 'relative', width: '280px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            height: '28px',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: '5px',
+            backgroundColor: 'var(--surface-subtle)',
+            padding: '0 8px',
+            gap: '6px',
           }}
-          onFocus={() => setIsSearchOpen(true)}
-        />
+        >
+          <Search size={12} color="var(--text-muted)" />
+          <input
+            placeholder="Search graph (⌘K)"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setIsSearchOpen(true);
+            }}
+            onFocus={() => setIsSearchOpen(true)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              outline: 'none',
+              fontSize: '11.5px',
+              color: 'var(--text-primary)',
+              flex: 1,
+            }}
+          />
+        </div>
 
-        {/* Instant Search Results Dropdown */}
+        {/* Live Search Autocomplete Dropdown */}
         {isSearchOpen && searchResults.length > 0 && (
           <div
-            className="search-results animate-slide-down"
             style={{
               position: 'absolute',
-              top: '42px',
+              top: '32px',
               left: 0,
               right: 0,
-              background: 'white',
-              border: '1px solid var(--border)',
-              borderRadius: '12px',
-              boxShadow: 'var(--shadow-lg)',
-              zIndex: 50,
-              maxHeight: '320px',
+              backgroundColor: '#ffffff',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '6px',
+              boxShadow: 'var(--shadow-drawer)',
+              zIndex: 60,
+              maxHeight: '260px',
               overflowY: 'auto',
-              padding: '4px',
+              padding: '3px',
             }}
           >
             {searchResults.map((n) => {
@@ -232,29 +192,42 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onClick={() => {
                     selectNode(n.id);
                     setTransform((prev) => ({
-                      x: window.innerWidth / 2 - (n.position.x + (n.size?.width || 210) / 2) * prev.zoom,
-                      y: window.innerHeight / 2 - (n.position.y + (n.size?.height || 110) / 2) * prev.zoom,
+                      x: window.innerWidth / 2 - (n.position.x + (n.size?.width || 240) / 2) * prev.zoom,
+                      y: window.innerHeight / 2 - (n.position.y + (n.size?.height || 76) / 2) * prev.zoom,
                       zoom: Math.max(0.85, prev.zoom),
                     }));
                     setIsSearchOpen(false);
                   }}
                   style={{
-                    padding: '8px 10px',
+                    padding: '6px 8px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    borderRadius: '7px',
+                    borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '12.5px',
+                    fontSize: '11.5px',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg2)')}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--surface-subtle)')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="tag type" style={{ fontSize: '10px' }}>{typeDef.label}</span>
-                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>{n.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        fontSize: '9.5px',
+                        fontFamily: 'var(--font-mono)',
+                        padding: '1px 4px',
+                        borderRadius: '3px',
+                        backgroundColor: 'var(--surface-subtle)',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      {typeDef.label}
+                    </span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{n.name}</span>
                   </div>
-                  <span style={{ fontSize: '11px', color: 'var(--text3)' }}>{n.status}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    {n.status}
+                  </span>
                 </div>
               );
             })}
@@ -263,56 +236,38 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {/* Right: Quick Action Controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <button
           onClick={undo}
           disabled={undoStack.length === 0}
-          className="btn small ghost"
+          className="hupa-btn ghost icon-only"
           title="Undo (Ctrl+Z)"
         >
-          <Undo2 size={13} /> Undo
+          <Undo2 size={13} />
         </button>
 
         <button
           onClick={redo}
           disabled={redoStack.length === 0}
-          className="btn small ghost"
+          className="hupa-btn ghost icon-only"
           title="Redo (Ctrl+Shift+Z)"
         >
-          <Redo2 size={13} /> Redo
+          <Redo2 size={13} />
         </button>
 
-        <span className="kbd" style={{ cursor: 'pointer' }} onClick={() => zoomToFit()} title="Fit to Screen (F)">
-          F
-        </span>
+        <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-subtle)', margin: '0 2px' }} />
 
-        <button onClick={() => zoomToFit()} className="btn small" title="Fit to Screen">
-          <Maximize2 size={12} /> Fit
-        </button>
-
-        <button onClick={handleAutoLayout} className="btn small" title="Auto-layout DAG">
-          <Sparkles size={12} color="var(--indigo)" /> Auto-layout
-        </button>
-
-        <button onClick={onOpenExport} className="btn small" title="Export JSON">
+        <button onClick={onOpenExport} className="hupa-btn ghost" title="Data Portability / Export">
           <Download size={12} /> Export
         </button>
 
-        <button onClick={onOpenStats} className="btn small" title="Analytics">
+        <button onClick={onOpenStats} className="hupa-btn ghost" title="Architecture Topology Analytics">
           <BarChart2 size={12} /> Analytics
         </button>
 
-        <button onClick={onOpenShortcuts} className="btn small ghost" title="Shortcuts (?)">
-          <HelpCircle size={14} />
+        <button onClick={onOpenShortcuts} className="hupa-btn ghost icon-only" title="Keyboard Cheatsheet (?)">
+          <HelpCircle size={13} />
         </button>
-
-        <button onClick={() => setNewNodeModalOpen(true)} className="btn small primary" title="Add Node">
-          <Plus size={13} /> Node
-        </button>
-
-        <div style={{ fontSize: '11px', color: 'var(--text3)', marginLeft: '4px', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
-          Saved • local
-        </div>
       </div>
     </header>
   );

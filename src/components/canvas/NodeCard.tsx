@@ -4,6 +4,7 @@ import { BUILTIN_NODE_TYPES } from '../../constants/nodeTypes';
 import { useGraphStore } from '../../store/useGraphStore';
 import { DynamicIcon } from '../common/DynamicIcon';
 import { snapToGrid } from '../../utils/geometry';
+import { GitFork, ArrowDownRight } from 'lucide-react';
 
 interface NodeCardProps {
   node: UPGNode;
@@ -34,7 +35,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
 
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [isTargetHovered, setIsTargetHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const dragStartRef = useRef<{ startX: number; startY: number; initialNodeX: number; initialNodeY: number }>({
     startX: 0,
@@ -46,23 +47,28 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   const resizeStartRef = useRef<{ startX: number; startY: number; initialW: number; initialH: number }>({
     startX: 0,
     startY: 0,
-    initialW: 250,
-    initialH: 80,
+    initialW: 240,
+    initialH: 76,
   });
 
   const isConnecting = pendingConnection !== null;
   const isSourceNode = pendingConnection?.sourceNodeId === node.id;
   const isEligibleTarget = isConnecting && !isSourceNode;
 
-  // Calculate dependency / edge count
-  const depCount = Object.values(edges).filter((e) => e.sourceNodeId === node.id || e.targetNodeId === node.id).length;
+  // Zoom Level of Detail (LOD)
+  const currentZoom = transform.zoom;
+  const isMacroView = currentZoom < 0.55;
+  const isDetailView = currentZoom > 1.25;
 
-  const nodeWidth = node.size?.width || 250;
-  const nodeHeight = node.size?.height || 80;
+  const nodeWidth = node.size?.width || 240;
+  const nodeHeight = node.size?.height || (isMacroView ? 44 : 76);
+
+  // Live dependency count
+  const depCount = Object.values(edges).filter((e) => e.sourceNodeId === node.id || e.targetNodeId === node.id).length;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (
-      (e.target as HTMLElement).closest('.handle') ||
+      (e.target as HTMLElement).closest('.node-handle-dot') ||
       (e.target as HTMLElement).closest('button') ||
       (e.target as HTMLElement).closest('.resize-handle')
     ) {
@@ -114,7 +120,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     };
   }, [isDragging, transform.zoom, isSnapToGrid, node.id, updateNodePosition]);
 
-  // Resizing logic
+  // Handle resizing
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsResizing(true);
@@ -133,8 +139,8 @@ export const NodeCard: React.FC<NodeCardProps> = ({
       const dx = (e.clientX - resizeStartRef.current.startX) / transform.zoom;
       const dy = (e.clientY - resizeStartRef.current.startY) / transform.zoom;
 
-      let newW = Math.max(200, resizeStartRef.current.initialW + dx);
-      let newH = Math.max(70, resizeStartRef.current.initialH + dy);
+      let newW = Math.max(180, resizeStartRef.current.initialW + dx);
+      let newH = Math.max(50, resizeStartRef.current.initialH + dy);
 
       if (isSnapToGrid) {
         newW = snapToGrid(newW);
@@ -201,50 +207,38 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     switch (status) {
       case 'completed':
       case 'review':
-        return '#10b981';
+        return '#059669';
       case 'in-progress':
-        return '#f59e0b';
+        return '#d97706';
       case 'blocked':
       case 'deprecated':
-        return '#ef4444';
+        return '#e11d48';
       default:
-        return '#9ea5b1';
+        return '#94a3b8';
     }
   };
 
   return (
     <div
       id={`node-${node.id}`}
-      className={`node ${isSelected ? 'selected' : ''}`}
+      className={`hupa-node ${isSelected ? 'is-selected' : ''} ${isDragging ? 'is-dragging' : ''} ${
+        isEligibleTarget && isHovered ? 'is-connection-target' : ''
+      } ${isSourceNode ? 'is-connection-source' : ''}`}
       style={{
         left: `${node.position.x}px`,
         top: `${node.position.y}px`,
         width: `${nodeWidth}px`,
         minHeight: `${nodeHeight}px`,
-        zIndex: isSelected ? 20 : isDragging ? 19 : isConnecting ? 15 : 10,
         position: 'absolute',
-        borderColor: isTargetHovered && isEligibleTarget
-          ? 'var(--indigo)'
-          : isSelected
-          ? '#111418'
-          : 'var(--border)',
-        boxShadow: isTargetHovered && isEligibleTarget
-          ? '0 0 0 3px rgba(79, 70, 229, 0.25), var(--shadow)'
-          : isSelected
-          ? '0 0 0 2px rgba(17, 20, 24, 0.1), var(--shadow)'
-          : 'var(--shadow-xs)',
+        padding: isMacroView ? '6px 10px' : '10px 12px',
+        justifyContent: isMacroView ? 'center' : 'space-between',
+        zIndex: isSelected ? 30 : isDragging ? 35 : isConnecting ? 25 : 15,
       }}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onMouseUp={(e) => {
-        if (isEligibleTarget) {
-          handleCompleteDrop(e, 'left');
-        }
-      }}
-      onMouseEnter={() => {
-        if (isEligibleTarget) setIsTargetHovered(true);
-      }}
-      onMouseLeave={() => {
-        setIsTargetHovered(false);
+        if (isEligibleTarget) handleCompleteDrop(e, 'left');
       }}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -256,27 +250,10 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         onContextMenu(e, node.id);
       }}
     >
-      <div>
-        {/* Header Row */}
-        <div className="node-header">
+      {/* 1. MACRO VIEW (When Zoom < 0.55) */}
+      {isMacroView ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
-            className="node-icon"
-            style={{
-              backgroundColor: 'var(--bg2)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <DynamicIcon name={typeDef.icon || 'Box'} size={12} color="var(--text)" />
-          </div>
-
-          <div className="node-title" title={node.name}>
-            {node.name}
-          </div>
-
-          {/* Status Dot */}
-          <div
-            title={`Status: ${node.status}`}
             style={{
               width: '6px',
               height: '6px',
@@ -285,136 +262,207 @@ export const NodeCard: React.FC<NodeCardProps> = ({
               flexShrink: 0,
             }}
           />
+          <div
+            style={{
+              fontWeight: 600,
+              fontSize: '13px',
+              color: 'var(--text-primary)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flex: 1,
+            }}
+          >
+            {node.name}
+          </div>
+          <span
+            style={{
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+            }}
+          >
+            {node.type}
+          </span>
+        </div>
+      ) : (
+        /* 2. STANDARD & DETAIL VIEW */
+        <>
+          <div>
+            {/* Top Identity Row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '9.5px',
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    color: 'var(--text-secondary)',
+                    backgroundColor: 'var(--surface-subtle)',
+                    padding: '1px 5px',
+                    borderRadius: '3px',
+                  }}
+                >
+                  <DynamicIcon name={typeDef.icon || 'Box'} size={10} color="var(--text-secondary)" />
+                  {typeDef.label}
+                </span>
 
-          {/* Subsystem child indicator */}
-          {node.subGraphId && (
-            <div className="child-ind" title="Contains nested subsystem (Double-click to dive)">
-              ↗
+                <div
+                  title={`Status: ${node.status}`}
+                  style={{
+                    width: '5px',
+                    height: '5px',
+                    borderRadius: '50%',
+                    backgroundColor: getStatusColor(node.status),
+                    flexShrink: 0,
+                  }}
+                />
+              </div>
+
+              {/* SubGraph Subsystem Drill-down Indicator */}
+              {node.subGraphId && (
+                <span
+                  style={{
+                    fontSize: '10px',
+                    color: 'var(--accent-indigo)',
+                    fontFamily: 'var(--font-mono)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                  }}
+                  title="Nested Subsystem Graph (Double click to enter)"
+                >
+                  <GitFork size={10} /> Subsystem ↗
+                </span>
+              )}
             </div>
-          )}
+
+            {/* Title */}
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: '12.5px',
+                color: 'var(--text-primary)',
+                letterSpacing: '-0.01em',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              title={node.name}
+            >
+              {node.name}
+            </div>
+
+            {/* Description (2-line clamp) */}
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                lineHeight: '1.35',
+                marginTop: '3px',
+                display: '-webkit-box',
+                WebkitLineClamp: isDetailView ? 3 : 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                minHeight: '14px',
+              }}
+            >
+              {node.description || 'No architectural description.'}
+            </div>
+          </div>
+
+          {/* Bottom Metadata / Deep Detail Tier */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: '6px',
+              paddingTop: '5px',
+              borderTop: '1px solid var(--surface-subtle)',
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <span>v{node.version || '0.1.0'}</span>
+
+            {isDetailView && node.owner && (
+              <span style={{ color: 'var(--text-secondary)' }}>@{node.owner}</span>
+            )}
+
+            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <ArrowDownRight size={10} /> {depCount} rels
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* 4 Precision Magnetic Handles (North, South, East, West) */}
+      {(isHovered || isSelected || isConnecting) && (
+        <>
+          {/* North */}
+          <div
+            className="node-handle-dot"
+            style={{ left: '50%', top: 0, transform: 'translate(-50%, -50%)' }}
+            title="Connect North"
+            onMouseDown={(e) => handleStartConnection(e, 'top')}
+            onMouseUp={(e) => handleCompleteDrop(e, 'top')}
+          />
+          {/* East */}
+          <div
+            className="node-handle-dot"
+            style={{ right: 0, top: '50%', transform: 'translate(50%, -50%)' }}
+            title="Connect East"
+            onMouseDown={(e) => handleStartConnection(e, 'right')}
+            onMouseUp={(e) => handleCompleteDrop(e, 'right')}
+          />
+          {/* South */}
+          <div
+            className="node-handle-dot"
+            style={{ left: '50%', bottom: 0, transform: 'translate(-50%, 50%)' }}
+            title="Connect South"
+            onMouseDown={(e) => handleStartConnection(e, 'bottom')}
+            onMouseUp={(e) => handleCompleteDrop(e, 'bottom')}
+          />
+          {/* West */}
+          <div
+            className="node-handle-dot"
+            style={{ left: 0, top: '50%', transform: 'translate(-50%, -50%)' }}
+            title="Connect West"
+            onMouseDown={(e) => handleStartConnection(e, 'left')}
+            onMouseUp={(e) => handleCompleteDrop(e, 'left')}
+          />
+        </>
+      )}
+
+      {/* Bottom-right Corner Resize Grip */}
+      {(isHovered || isSelected) && (
+        <div
+          className="resize-handle"
+          onMouseDown={handleResizeMouseDown}
+          style={{
+            position: 'absolute',
+            right: '2px',
+            bottom: '2px',
+            width: '8px',
+            height: '8px',
+            cursor: 'nwse-resize',
+            opacity: 0.4,
+          }}
+          title="Resize node"
+        >
+          <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
+            <path d="M5 1L1 5M5 3L3 5M5 5H5.01" stroke="#94a3b8" strokeWidth="1" strokeLinecap="round" />
+          </svg>
         </div>
-
-        {/* Description */}
-        <div className="node-desc">
-          {node.description || 'No description provided.'}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="node-footer">
-        <span className="tag type">{node.type}</span>
-
-        <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
-          ● {depCount} • v{node.version || '0.1.0'}
-        </div>
-      </div>
-
-      {/* Connection Handles (North, South, East, West) */}
-      <div className="handles" style={{ pointerEvents: 'none' }}>
-        <div
-          className="handle n"
-          title="Connect Top"
-          onMouseDown={(e) => handleStartConnection(e, 'top')}
-          onMouseUp={(e) => handleCompleteDrop(e, 'top')}
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: 0,
-            transform: 'translate(-50%, -50%)',
-            width: '9px',
-            height: '9px',
-            background: 'white',
-            border: '2px solid var(--indigo)',
-            borderRadius: '50%',
-            cursor: 'crosshair',
-            pointerEvents: 'auto',
-            opacity: isSelected || isConnecting ? 1 : 0.6,
-          }}
-        />
-        <div
-          className="handle e"
-          title="Connect Right"
-          onMouseDown={(e) => handleStartConnection(e, 'right')}
-          onMouseUp={(e) => handleCompleteDrop(e, 'right')}
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: '50%',
-            transform: 'translate(50%, -50%)',
-            width: '9px',
-            height: '9px',
-            background: 'white',
-            border: '2px solid var(--indigo)',
-            borderRadius: '50%',
-            cursor: 'crosshair',
-            pointerEvents: 'auto',
-            opacity: isSelected || isConnecting ? 1 : 0.6,
-          }}
-        />
-        <div
-          className="handle s"
-          title="Connect Bottom"
-          onMouseDown={(e) => handleStartConnection(e, 'bottom')}
-          onMouseUp={(e) => handleCompleteDrop(e, 'bottom')}
-          style={{
-            position: 'absolute',
-            left: '50%',
-            bottom: 0,
-            transform: 'translate(-50%, 50%)',
-            width: '9px',
-            height: '9px',
-            background: 'white',
-            border: '2px solid var(--indigo)',
-            borderRadius: '50%',
-            cursor: 'crosshair',
-            pointerEvents: 'auto',
-            opacity: isSelected || isConnecting ? 1 : 0.6,
-          }}
-        />
-        <div
-          className="handle w"
-          title="Connect Left"
-          onMouseDown={(e) => handleStartConnection(e, 'left')}
-          onMouseUp={(e) => handleCompleteDrop(e, 'left')}
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '9px',
-            height: '9px',
-            background: 'white',
-            border: '2px solid var(--indigo)',
-            borderRadius: '50%',
-            cursor: 'crosshair',
-            pointerEvents: 'auto',
-            opacity: isSelected || isConnecting ? 1 : 0.6,
-          }}
-        />
-      </div>
-
-      {/* Resize Grip (Bottom-Right) */}
-      <div
-        className="resize-handle"
-        onMouseDown={handleResizeMouseDown}
-        style={{
-          position: 'absolute',
-          right: '3px',
-          bottom: '3px',
-          width: '7px',
-          height: '7px',
-          cursor: 'nwse-resize',
-          opacity: isSelected ? 0.6 : 0.2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        title="Resize node"
-      >
-        <svg width="5" height="5" viewBox="0 0 6 6" fill="none">
-          <path d="M5 1L1 5M5 3L3 5M5 5H5.01" stroke="#9ea5b1" strokeWidth="1" strokeLinecap="round" />
-        </svg>
-      </div>
+      )}
     </div>
   );
 };
