@@ -79,20 +79,27 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     };
   }, []);
 
-  // Active view filter configuration
-  const currentView = views.find((v) => v.id === activeViewId) || views[0];
+  // Safe active view filter configuration
+  const currentView = (views && views.find((v) => v.id === activeViewId)) || (views && views[0]) || {
+    id: 'view-all',
+    name: 'Unified Graph',
+    perspective: 'all',
+    filterCategories: [],
+    filterNodeTypes: [],
+    filterRelationshipTypes: [],
+  };
 
   // Filter nodes based on active view and search query
-  const filteredNodes = Object.values(nodes).filter((node) => {
-    if (node.graphId !== activeGraphId) return false;
+  const filteredNodes = Object.values(nodes || {}).filter((node) => {
+    if (!node || node.graphId !== activeGraphId) return false;
 
     // Search query filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchesName = node.name.toLowerCase().includes(q);
-      const matchesDesc = node.description.toLowerCase().includes(q);
-      const matchesType = node.type.toLowerCase().includes(q);
-      const matchesTag = node.tags.some((t) => t.toLowerCase().includes(q));
+      const matchesName = node.name?.toLowerCase().includes(q);
+      const matchesDesc = node.description?.toLowerCase().includes(q);
+      const matchesType = node.type?.toLowerCase().includes(q);
+      const matchesTag = node.tags?.some((t) => t.toLowerCase().includes(q));
       if (!matchesName && !matchesDesc && !matchesType && !matchesTag) {
         return false;
       }
@@ -119,8 +126,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
 
   // Filter edges
-  const filteredEdges = Object.values(edges).filter((edge) => {
-    if (edge.graphId !== activeGraphId) return false;
+  const filteredEdges = Object.values(edges || {}).filter((edge) => {
+    if (!edge || edge.graphId !== activeGraphId) return false;
     // Both endpoints must be visible
     if (!filteredNodeIds.has(edge.sourceNodeId) || !filteredNodeIds.has(edge.targetNodeId)) {
       return false;
@@ -138,7 +145,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   });
 
   // Filter groups
-  const filteredGroups = Object.values(groups).filter((g) => g.graphId === activeGraphId);
+  const filteredGroups = Object.values(groups || {}).filter((g) => g && g.graphId === activeGraphId);
 
   // Mouse wheel zoom with focal point
   const handleWheel = useCallback(
@@ -285,6 +292,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     pendingLinePath = calculateBezierPath(p1, p2, pendingConnection.sourceHandle, 'left').path;
   }
 
+  const isPerspectiveFiltered = currentView && currentView.perspective !== 'all';
+
   return (
     <div
       ref={containerRef}
@@ -337,7 +346,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 markerHeight="6"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#09090b" />
+                <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#0f172a" />
               </marker>
             ))}
           </defs>
@@ -384,7 +393,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               <path
                 d={pendingLinePath}
                 fill="none"
-                stroke="#09090b"
+                stroke="#0f172a"
                 strokeWidth={2}
                 strokeDasharray="6, 4"
                 style={{ animation: 'dashFlow 0.8s linear infinite' }}
@@ -421,8 +430,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               top: `${Math.min(marqueeBox.startY, marqueeBox.currentY)}px`,
               width: `${Math.abs(marqueeBox.currentX - marqueeBox.startX)}px`,
               height: `${Math.abs(marqueeBox.currentY - marqueeBox.startY)}px`,
-              border: '1.5px solid #09090b',
-              backgroundColor: 'rgba(0, 0, 0, 0.05)',
+              border: '1.5px solid #0f172a',
+              backgroundColor: 'rgba(15, 23, 42, 0.05)',
               borderRadius: '4px',
               pointerEvents: 'none',
               zIndex: 50,
@@ -450,8 +459,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           <div
             style={{
               padding: '24px 32px',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(8px)',
+              backgroundColor: 'rgba(255, 255, 255, 0.96)',
+              backdropFilter: 'blur(12px)',
               borderRadius: '12px',
               border: '1px solid var(--border-subtle)',
               boxShadow: 'var(--shadow-md)',
@@ -464,17 +473,17 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             }}
           >
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {currentView.perspective !== 'all'
-                ? `No nodes in "${currentView.name}"`
+              {isPerspectiveFiltered
+                ? `No nodes in "${currentView?.name || 'Perspective'}"`
                 : 'Empty Graph Canvas'}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-              {currentView.perspective !== 'all'
+              {isPerspectiveFiltered
                 ? 'The active view perspective filtered out all nodes. Switch to Unified Graph or add relevant components.'
                 : 'Start designing your architecture by adding a node or applying a starter layout.'}
             </div>
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              {currentView.perspective !== 'all' ? (
+              {isPerspectiveFiltered ? (
                 <button
                   onClick={() => setActiveView('view-all')}
                   className="btn btn-primary"

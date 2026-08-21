@@ -22,6 +22,7 @@ import { BUILTIN_RELATIONSHIP_TYPES } from '../constants/relationshipTypes';
 import { UNIVERSAL_TEMPLATES } from '../constants/templates';
 
 const LOCAL_STORAGE_KEY = 'hupa_workspace_state_v1';
+const LEGACY_STORAGE_KEY = 'upg_workspace_state_v1';
 
 export interface BreadcrumbItem {
   graphId: string;
@@ -205,22 +206,33 @@ export interface GraphStoreState {
   redo: () => void;
 }
 
+// Generate initial synchronous state so canvas never starts empty/null
+const initialTemplate = UNIVERSAL_TEMPLATES[1].createData('proj-default');
+const initialProjectId = initialTemplate.project.id;
+const initialRootGraphId = initialTemplate.project.rootGraphId;
+const initialViews = DEFAULT_VIEWS.map((v) => ({ ...v, projectId: initialProjectId }));
+
 export const useGraphStore = create<GraphStoreState>((set, get) => ({
-  projects: {},
-  activeProjectId: '',
-  graphs: {},
-  activeGraphId: '',
-  breadcrumbs: [],
-  nodes: {},
-  edges: {},
-  groups: {},
+  projects: { [initialProjectId]: initialTemplate.project },
+  activeProjectId: initialProjectId,
+  graphs: initialTemplate.graphs,
+  activeGraphId: initialRootGraphId,
+  breadcrumbs: [
+    {
+      graphId: initialRootGraphId,
+      name: initialTemplate.graphs[initialRootGraphId]?.name || 'System Architecture',
+    },
+  ],
+  nodes: initialTemplate.nodes,
+  edges: initialTemplate.edges,
+  groups: initialTemplate.groups,
   documents: {},
-  views: [],
+  views: initialViews,
   activeViewId: 'view-all',
   searchQuery: '',
 
-  transform: { x: 300, y: 150, zoom: 0.85 },
-  selectedNodeIds: [],
+  transform: { x: 280, y: 140, zoom: 0.8 },
+  selectedNodeIds: Object.keys(initialTemplate.nodes).slice(0, 1),
   selectedEdgeIds: [],
   selectedGroupIds: [],
   activeTool: 'select',
@@ -250,26 +262,30 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
 
   initialize: () => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.projects && parsed.activeProjectId && parsed.graphs && parsed.projects[parsed.activeProjectId]) {
+          const activeProj = parsed.projects[parsed.activeProjectId];
+          const activeGId = parsed.activeGraphId || activeProj.rootGraphId;
+          const rootGraph = parsed.graphs[activeGId] || parsed.graphs[activeProj.rootGraphId];
+
           set({
             projects: parsed.projects,
             activeProjectId: parsed.activeProjectId,
             graphs: parsed.graphs,
-            activeGraphId: parsed.activeGraphId || parsed.projects[parsed.activeProjectId]?.rootGraphId,
+            activeGraphId: activeGId,
             nodes: parsed.nodes || {},
             edges: parsed.edges || {},
             groups: parsed.groups || {},
             documents: parsed.documents || {},
-            views: parsed.views || DEFAULT_VIEWS.map((v) => ({ ...v, projectId: parsed.activeProjectId })),
+            views: parsed.views && parsed.views.length > 0 ? parsed.views : DEFAULT_VIEWS.map((v) => ({ ...v, projectId: parsed.activeProjectId })),
             customNodeTypes: parsed.customNodeTypes || {},
             customRelationshipTypes: parsed.customRelationshipTypes || {},
-            breadcrumbs: parsed.breadcrumbs || [
+            breadcrumbs: parsed.breadcrumbs && parsed.breadcrumbs.length > 0 ? parsed.breadcrumbs : [
               {
-                graphId: parsed.graphs[parsed.activeGraphId]?.id || 'root',
-                name: parsed.graphs[parsed.activeGraphId]?.name || 'Root Graph',
+                graphId: activeGId,
+                name: rootGraph ? rootGraph.name : 'System Architecture',
               },
             ],
           });
@@ -277,11 +293,11 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
         }
       }
     } catch (err) {
-      console.warn('Failed to load from localStorage, resetting to default template', err);
+      console.warn('Failed to load from localStorage, using clean initial template', err);
     }
 
-    // Default to clean Fullstack Web Application starter
-    get().resetToTemplate('fullstack-web');
+    // Save initial starter state
+    get().saveToStorage();
   },
 
   saveToStorage: () => {
@@ -543,7 +559,6 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     const template = UNIVERSAL_TEMPLATES.find((t) => t.id === templateId) || UNIVERSAL_TEMPLATES[0];
     const data = template.createData(projectId);
 
-    // Override name and description with user input
     data.project.name = name;
     if (description.trim()) data.project.description = description;
     if (domain.trim()) data.project.domain = domain;
@@ -590,7 +605,6 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     const remainingProjects = { ...state.projects };
     delete remainingProjects[projectId];
 
-    // Purge all graphs, nodes, edges, groups, docs belonging to this project
     const remainingGraphs: Record<string, UPGGraph> = {};
     Object.values(state.graphs).forEach((g) => {
       if (g.projectId !== projectId) remainingGraphs[g.id] = g;
@@ -680,8 +694,8 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     const width = maxX - minX + padding * 2;
     const height = maxY - minY + padding * 2;
 
-    const viewportW = window.innerWidth - (state.isSidebarOpen ? 260 : 52) - (state.isInspectorOpen ? 360 : 0);
-    const viewportH = window.innerHeight - 80;
+    const viewportW = window.innerWidth - (state.isSidebarOpen ? 250 : 44) - (state.isInspectorOpen ? 350 : 0);
+    const viewportH = window.innerHeight - 74;
 
     const zoom = Math.max(0.2, Math.min(1.2, Math.min(viewportW / width, viewportH / height)));
     const x = (viewportW - (maxX + minX) * zoom) / 2;
@@ -1017,7 +1031,7 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
       targetHandle,
       type,
       label: label || relDef?.label || type,
-      color: relDef?.color || '#09090b',
+      color: relDef?.color || '#0f172a',
       lineStyle: relDef?.lineStyle || 'solid',
       animated: relDef?.animated || false,
       createdAt: Date.now(),
@@ -1083,7 +1097,7 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
   },
 
   // Groups
-  addGroup: (name, nodeIds, color = '#09090b') => {
+  addGroup: (name, nodeIds, color = '#0f172a') => {
     const state = get();
     get().pushHistorySnapshot();
 
@@ -1149,7 +1163,7 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     return id;
   },
 
-  groupSelectedNodes: (name = 'New Subsystem Group') => {
+  groupSelectedNodes: (name = 'New Component Group') => {
     const state = get();
     if (state.selectedNodeIds.length < 2) return null;
     return get().addGroup(name, state.selectedNodeIds);
