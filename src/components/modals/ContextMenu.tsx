@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
+import { BUILTIN_RELATIONSHIP_TYPES } from '../../constants/relationshipTypes';
 import {
   GitFork,
   Copy,
@@ -9,6 +10,7 @@ import {
   Plus,
   Edit,
   FolderPlus,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 export interface ContextMenuState {
@@ -32,9 +34,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 }) => {
   const {
     nodes,
+    edges,
     selectedNodeIds,
     deleteNode,
     deleteEdge,
+    updateEdge,
     duplicateSelectedNodes,
     drillIntoNode,
     groupSelectedNodes,
@@ -42,6 +46,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     zoomToFit,
     setInspectorOpen,
     setInspectorTab,
+    addNode,
+    addEdge,
   } = useGraphStore();
 
   const menuRef = useRef<HTMLDivElement>(null);
@@ -61,6 +67,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   if (!menuState.isOpen) return null;
 
   const targetNode = menuState.targetId ? nodes[menuState.targetId] : null;
+  const targetEdge = menuState.targetId ? edges[menuState.targetId] : null;
 
   return (
     <div
@@ -68,9 +75,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       className="glass-panel animate-slide-down"
       style={{
         position: 'fixed',
-        left: `${Math.min(menuState.x, window.innerWidth - 200)}px`,
-        top: `${Math.min(menuState.y, window.innerHeight - 260)}px`,
-        width: '190px',
+        left: `${Math.min(menuState.x, window.innerWidth - 220)}px`,
+        top: `${Math.min(menuState.y, window.innerHeight - 320)}px`,
+        width: '200px',
         backgroundColor: '#ffffff',
         padding: '4px',
         zIndex: 100,
@@ -78,12 +85,22 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '2px',
+        borderRadius: '8px',
+        border: '1px solid var(--border)',
       }}
     >
       {/* Node Context Menu */}
       {menuState.type === 'node' && targetNode && (
         <>
-          <div style={{ padding: '6px 8px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div
+            style={{
+              padding: '6px 8px',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--text3)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
             {targetNode.name}
           </div>
 
@@ -92,10 +109,26 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               drillIntoNode(targetNode.id);
               onClose();
             }}
-            className="btn"
-            style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px' }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <GitFork size={13} color="#09090b" /> Drill into Subsystem
+            <GitFork size={12} color="var(--indigo)" /> Drill into Subsystem ↗
+          </button>
+
+          <button
+            onClick={() => {
+              const newChildId = addNode({
+                name: `${targetNode.name} Child`,
+                type: targetNode.type,
+                position: { x: targetNode.position.x + 40, y: targetNode.position.y + 120 },
+              });
+              addEdge(targetNode.id, newChildId, 'contains', 'contains');
+              onClose();
+            }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+          >
+            <Plus size={12} /> Create Child Node
           </button>
 
           <button
@@ -104,10 +137,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               setInspectorTab('overview');
               onClose();
             }}
-            className="btn"
-            style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px' }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <Edit size={13} /> Inspect Properties
+            <Edit size={12} /> Inspect Properties
           </button>
 
           <button
@@ -115,10 +148,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               duplicateSelectedNodes();
               onClose();
             }}
-            className="btn"
-            style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px' }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <Copy size={13} /> Duplicate Node
+            <Copy size={12} /> Duplicate Node
           </button>
 
           {selectedNodeIds.length >= 2 && (
@@ -127,40 +160,99 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 groupSelectedNodes('New Component Group');
                 onClose();
               }}
-              className="btn"
-              style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px' }}
+              className="btn ghost small"
+              style={{ width: '100%', justifyContent: 'flex-start' }}
             >
-              <FolderPlus size={13} /> Group Selected ({selectedNodeIds.length})
+              <FolderPlus size={12} /> Group Selected ({selectedNodeIds.length})
             </button>
           )}
 
-          <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
+          <div style={{ height: '1px', backgroundColor: 'var(--border)', margin: '2px 0' }} />
 
           <button
             onClick={() => {
               deleteNode(targetNode.id);
               onClose();
             }}
-            className="btn"
-            style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px', color: '#71717a' }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start', color: '#ef4444' }}
           >
-            <Trash2 size={13} /> Delete Node
+            <Trash2 size={12} /> Delete Node
           </button>
         </>
       )}
 
       {/* Edge Context Menu */}
-      {menuState.type === 'edge' && (
+      {menuState.type === 'edge' && targetEdge && (
         <>
+          <div
+            style={{
+              padding: '6px 8px',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--text3)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            Relationship: {targetEdge.label || targetEdge.type}
+          </div>
+
           <button
             onClick={() => {
-              if (menuState.targetId) deleteEdge(menuState.targetId);
+              updateEdge(targetEdge.id, {
+                sourceNodeId: targetEdge.targetNodeId,
+                targetNodeId: targetEdge.sourceNodeId,
+              });
               onClose();
             }}
-            className="btn"
-            style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px', color: '#71717a' }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <Trash2 size={13} /> Delete Relationship
+            <ArrowLeftRight size={12} /> Swap Direction
+          </button>
+
+          <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase' }}>
+            Set Relation Type
+          </div>
+
+          <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            {Object.values(BUILTIN_RELATIONSHIP_TYPES).slice(0, 8).map((rel) => (
+              <button
+                key={rel.type}
+                onClick={() => {
+                  updateEdge(targetEdge.id, {
+                    type: rel.type,
+                    label: rel.label,
+                    color: rel.color,
+                  });
+                  onClose();
+                }}
+                className="btn ghost small"
+                style={{
+                  width: '100%',
+                  justifyContent: 'space-between',
+                  fontWeight: targetEdge.type === rel.type ? 600 : 400,
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                }}
+              >
+                <span>{rel.label}</span>
+                {targetEdge.type === rel.type && <span>•</span>}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ height: '1px', backgroundColor: 'var(--border)', margin: '2px 0' }} />
+
+          <button
+            onClick={() => {
+              deleteEdge(targetEdge.id);
+              onClose();
+            }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start', color: '#ef4444' }}
+          >
+            <Trash2 size={12} /> Delete Relationship
           </button>
         </>
       )}
@@ -173,10 +265,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               setNewNodeModalOpen(true);
               onClose();
             }}
-            className="btn"
-            style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px' }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <Plus size={13} color="#09090b" /> Create Node
+            <Plus size={12} /> Create Node Here
           </button>
 
           {selectedNodeIds.length >= 2 && (
@@ -185,10 +277,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 groupSelectedNodes('New Component Group');
                 onClose();
               }}
-              className="btn"
-              style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px' }}
+              className="btn ghost small"
+              style={{ width: '100%', justifyContent: 'flex-start' }}
             >
-              <FolderPlus size={13} /> Group Selected ({selectedNodeIds.length})
+              <FolderPlus size={12} /> Group Selected ({selectedNodeIds.length})
             </button>
           )}
 
@@ -197,10 +289,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               onAutoLayout();
               onClose();
             }}
-            className="btn"
-            style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px' }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <Sparkles size={13} color="#09090b" /> Auto-Layout Graph
+            <Sparkles size={12} color="var(--indigo)" /> Auto-Layout Graph
           </button>
 
           <button
@@ -208,10 +300,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               zoomToFit();
               onClose();
             }}
-            className="btn"
-            style={{ width: '100%', justifyContent: 'flex-start', border: 'none', padding: '6px 8px' }}
+            className="btn ghost small"
+            style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <Maximize2 size={13} /> Fit to Screen
+            <Maximize2 size={12} /> Fit to Screen
           </button>
         </>
       )}
