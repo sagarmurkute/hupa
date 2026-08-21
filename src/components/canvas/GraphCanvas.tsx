@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { BUILTIN_RELATIONSHIP_TYPES } from '../../constants/relationshipTypes';
 import { BUILTIN_NODE_TYPES } from '../../constants/nodeTypes';
@@ -147,26 +147,42 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   // Filter groups
   const filteredGroups = Object.values(groups || {}).filter((g) => g && g.graphId === activeGraphId);
 
-  // Mouse wheel zoom with focal point
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      e.preventDefault();
-      if (!containerRef.current) return;
+  // Native Wheel & Trackpad Pinch Gesture with focal point zooming
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-      const rect = containerRef.current.getBoundingClientRect();
+    const handleWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
-      const newZoom = Math.max(0.15, Math.min(3.0, transform.zoom * zoomFactor));
+      const currentTransform = useGraphStore.getState().transform;
 
-      const newX = mouseX - (mouseX - transform.x) * (newZoom / transform.zoom);
-      const newY = mouseY - (mouseY - transform.y) * (newZoom / transform.zoom);
+      // Check if pinch-to-zoom (ctrlKey) or standard wheel zoom
+      if (e.ctrlKey || e.metaKey) {
+        // High-precision pinch zoom
+        const zoomDelta = -e.deltaY * 0.01;
+        const newZoom = Math.max(0.15, Math.min(3.0, currentTransform.zoom * (1 + zoomDelta)));
+        const newX = mouseX - (mouseX - currentTransform.x) * (newZoom / currentTransform.zoom);
+        const newY = mouseY - (mouseY - currentTransform.y) * (newZoom / currentTransform.zoom);
+        setTransform({ x: newX, y: newY, zoom: newZoom });
+      } else {
+        // Standard mouse wheel zooming or 2-finger scroll
+        // If altKey is pressed or purely vertical delta with large magnitude -> Zoom
+        // Otherwise smooth zoom
+        const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+        const newZoom = Math.max(0.15, Math.min(3.0, currentTransform.zoom * zoomFactor));
+        const newX = mouseX - (mouseX - currentTransform.x) * (newZoom / currentTransform.zoom);
+        const newY = mouseY - (mouseY - currentTransform.y) * (newZoom / currentTransform.zoom);
+        setTransform({ x: newX, y: newY, zoom: newZoom });
+      }
+    };
 
-      setTransform({ x: newX, y: newY, zoom: newZoom });
-    },
-    [transform, setTransform]
-  );
+    el.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheelNative);
+  }, [setTransform]);
 
   // Canvas background mousedown for panning / marquee
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -298,7 +314,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     <div
       ref={containerRef}
       className={`canvas-wrapper ${isGridVisible ? 'canvas-grid-dots' : ''}`}
-      onWheel={handleWheel}
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
