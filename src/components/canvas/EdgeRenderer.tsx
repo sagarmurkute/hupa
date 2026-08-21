@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { UPGEdge, UPGNode, RelationshipTypeDefinition } from '../../types/graph';
 import { BUILTIN_RELATIONSHIP_TYPES } from '../../constants/relationshipTypes';
 import { getHandleCoordinates, calculateBezierPath } from '../../utils/geometry';
@@ -23,32 +23,40 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
   onSelect,
   onContextMenu,
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
   const relDef = customType || BUILTIN_RELATIONSHIP_TYPES[edge.type] || BUILTIN_RELATIONSHIP_TYPES.custom;
 
   // Determine handles
   const sourceHandle: HandlePosition = (edge.sourceHandle as HandlePosition) || 'right';
   const targetHandle: HandlePosition = (edge.targetHandle as HandlePosition) || 'left';
 
-  const p1 = getHandleCoordinates(sourceNode.position, sourceNode.size, sourceHandle);
-  const p2 = getHandleCoordinates(targetNode.position, targetNode.size, targetHandle);
+  const p1 = getHandleCoordinates(sourceNode.position, sourceNode.size || { width: 210, height: 110 }, sourceHandle);
+  const p2 = getHandleCoordinates(targetNode.position, targetNode.size || { width: 210, height: 110 }, targetHandle);
 
   const { path, midPoint } = calculateBezierPath(p1, p2, sourceHandle, targetHandle);
 
-  const edgeColor = isSelected ? '#09090b' : edge.color || relDef.color || '#27272a';
-  const strokeWidth = isSelected ? 2.5 : 1.75;
+  const edgeColor = isSelected ? '#0f172a' : isHovered ? '#1e293b' : edge.color || relDef.color || '#64748b';
+  const strokeWidth = isSelected ? 2.5 : isHovered ? 2.0 : 1.5;
   const lineStyle = edge.lineStyle || relDef.lineStyle || 'solid';
 
   const getStrokeDasharray = () => {
-    if (lineStyle === 'dashed') return '6, 4';
-    if (lineStyle === 'dotted') return '2, 4';
+    if (lineStyle === 'dashed') return '5, 4';
+    if (lineStyle === 'dotted') return '2, 3';
     return undefined;
   };
 
   const isAnimated = edge.animated || relDef.animated;
+  const labelText = edge.label || edge.type;
+  const pillWidth = Math.max(48, labelText.length * 6.5 + 16);
 
   return (
-    <g id={`edge-${edge.id}`} className="graph-edge-group">
-      {/* Fat invisible path for easier hover/click hit testing */}
+    <g
+      id={`edge-${edge.id}`}
+      className="graph-edge-group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Invisible hit testing target for hover/click */}
       <path
         d={path}
         fill="none"
@@ -66,18 +74,18 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
         }}
       />
 
-      {/* Selected halo glow */}
+      {/* Selected halo ring */}
       {isSelected && (
         <path
           d={path}
           fill="none"
-          stroke="#09090b"
+          stroke="#0f172a"
           strokeWidth={6}
-          strokeOpacity={0.2}
+          strokeOpacity={0.15}
         />
       )}
 
-      {/* Main visible path */}
+      {/* Main visible curve */}
       <path
         d={path}
         fill="none"
@@ -86,13 +94,13 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
         strokeDasharray={getStrokeDasharray()}
         markerEnd={`url(#marker-${edge.type})`}
         style={{
-          transition: 'stroke 0.15s ease, stroke-width 0.15s ease',
+          transition: 'stroke 0.12s ease, stroke-width 0.12s ease',
           animation: isAnimated ? 'dashFlow 1.2s linear infinite' : undefined,
         }}
       />
 
       {/* Interactive Midpoint Label Pill */}
-      {edge.label && (
+      {labelText && (
         <g
           transform={`translate(${midPoint.x}, ${midPoint.y})`}
           style={{ cursor: 'pointer' }}
@@ -102,29 +110,30 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
           }}
         >
           <rect
-            x={-((edge.label.length * 6.2) / 2 + 8)}
-            y={-10}
-            width={edge.label.length * 6.2 + 16}
-            height={20}
-            rx={10}
+            x={-(pillWidth / 2)}
+            y={-9}
+            width={pillWidth}
+            height={18}
+            rx={9}
             fill="#ffffff"
-            stroke={isSelected ? '#09090b' : '#d4d4d8'}
+            stroke={isSelected ? '#0f172a' : isHovered ? '#64748b' : '#cbd5e1'}
             strokeWidth={isSelected ? 1.5 : 1}
             style={{
-              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.06))',
-              transition: 'stroke 0.15s ease',
+              filter: isSelected ? 'drop-shadow(0 2px 4px rgba(15,23,42,0.12))' : 'drop-shadow(0 1px 2px rgba(15,23,42,0.05))',
+              transition: 'all 0.12s ease',
             }}
           />
           <text
             x={0}
             y={3.5}
             textAnchor="middle"
-            fill={isSelected ? '#09090b' : '#3f3f46'}
-            fontSize={10}
-            fontWeight={500}
+            fill={isSelected ? '#0f172a' : '#334155'}
+            fontSize={9.5}
+            fontWeight={600}
             fontFamily="var(--font-mono)"
+            letterSpacing="-0.01em"
           >
-            {edge.label}
+            {labelText}
           </text>
         </g>
       )}
