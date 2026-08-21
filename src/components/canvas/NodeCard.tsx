@@ -29,10 +29,12 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     isSnapToGrid,
     transform,
     edges,
+    pendingConnection,
   } = useGraphStore();
 
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [isTargetHovered, setIsTargetHovered] = useState(false);
 
   const dragStartRef = useRef<{ startX: number; startY: number; initialNodeX: number; initialNodeY: number }>({
     startX: 0,
@@ -44,18 +46,26 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   const resizeStartRef = useRef<{ startX: number; startY: number; initialW: number; initialH: number }>({
     startX: 0,
     startY: 0,
-    initialW: 264,
-    initialH: 100,
+    initialW: 250,
+    initialH: 80,
   });
+
+  const isConnecting = pendingConnection !== null;
+  const isSourceNode = pendingConnection?.sourceNodeId === node.id;
+  const isEligibleTarget = isConnecting && !isSourceNode;
 
   // Calculate dependency / edge count
   const depCount = Object.values(edges).filter((e) => e.sourceNodeId === node.id || e.targetNodeId === node.id).length;
 
-  const nodeWidth = node.size?.width || 264;
-  const nodeHeight = node.size?.height || 100;
+  const nodeWidth = node.size?.width || 250;
+  const nodeHeight = node.size?.height || 80;
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.handle') || (e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('.resize-handle')) {
+    if (
+      (e.target as HTMLElement).closest('.handle') ||
+      (e.target as HTMLElement).closest('button') ||
+      (e.target as HTMLElement).closest('.resize-handle')
+    ) {
       return;
     }
 
@@ -123,8 +133,8 @@ export const NodeCard: React.FC<NodeCardProps> = ({
       const dx = (e.clientX - resizeStartRef.current.startX) / transform.zoom;
       const dy = (e.clientY - resizeStartRef.current.startY) / transform.zoom;
 
-      let newW = Math.max(220, resizeStartRef.current.initialW + dx);
-      let newH = Math.max(88, resizeStartRef.current.initialH + dy);
+      let newW = Math.max(200, resizeStartRef.current.initialW + dx);
+      let newH = Math.max(70, resizeStartRef.current.initialH + dy);
 
       if (isSnapToGrid) {
         newW = snapToGrid(newW);
@@ -146,12 +156,13 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     };
   }, [isResizing, transform.zoom, isSnapToGrid, node.id, updateNodeSize]);
 
-  // Handle connection start
+  // Handle connection start from any handle
   const handleStartConnection = (
     e: React.MouseEvent,
     handlePos: 'top' | 'right' | 'bottom' | 'left'
   ) => {
     e.stopPropagation();
+    e.preventDefault();
     const handleCoordX =
       handlePos === 'right'
         ? node.position.x + nodeWidth
@@ -168,18 +179,19 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     startConnection(node.id, handlePos, handleCoordX, handleCoordY);
   };
 
-  // Handle connection drop onto this node
-  const handleMouseUpOnNode = (
+  // Handle connection drop onto this node or its handles
+  const handleCompleteDrop = (
     e: React.MouseEvent,
     targetHandle: 'top' | 'right' | 'bottom' | 'left' = 'left'
   ) => {
-    const { pendingConnection } = useGraphStore.getState();
-    if (pendingConnection && pendingConnection.sourceNodeId !== node.id) {
+    const currentPending = useGraphStore.getState().pendingConnection;
+    if (currentPending && currentPending.sourceNodeId !== node.id) {
       e.stopPropagation();
+      e.preventDefault();
       openRelationshipPicker(
-        pendingConnection.sourceNodeId,
+        currentPending.sourceNodeId,
         node.id,
-        pendingConnection.sourceHandle,
+        currentPending.sourceHandle,
         targetHandle
       );
     }
@@ -187,22 +199,18 @@ export const NodeCard: React.FC<NodeCardProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
       case 'completed':
-      case 'stable':
+      case 'review':
         return '#10b981';
       case 'in-progress':
-      case 'development':
         return '#f59e0b';
       case 'blocked':
       case 'deprecated':
         return '#ef4444';
       default:
-        return '#9ca3af';
+        return '#9ea5b1';
     }
   };
-
-  const statusColor = getStatusColor(node.status);
 
   return (
     <div
@@ -213,10 +221,31 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         top: `${node.position.y}px`,
         width: `${nodeWidth}px`,
         minHeight: `${nodeHeight}px`,
-        zIndex: isSelected ? 20 : isDragging ? 19 : 10,
+        zIndex: isSelected ? 20 : isDragging ? 19 : isConnecting ? 15 : 10,
         position: 'absolute',
+        borderColor: isTargetHovered && isEligibleTarget
+          ? 'var(--indigo)'
+          : isSelected
+          ? '#111418'
+          : 'var(--border)',
+        boxShadow: isTargetHovered && isEligibleTarget
+          ? '0 0 0 3px rgba(79, 70, 229, 0.25), var(--shadow)'
+          : isSelected
+          ? '0 0 0 2px rgba(17, 20, 24, 0.1), var(--shadow)'
+          : 'var(--shadow-xs)',
       }}
       onMouseDown={handleMouseDown}
+      onMouseUp={(e) => {
+        if (isEligibleTarget) {
+          handleCompleteDrop(e, 'left');
+        }
+      }}
+      onMouseEnter={() => {
+        if (isEligibleTarget) setIsTargetHovered(true);
+      }}
+      onMouseLeave={() => {
+        setIsTargetHovered(false);
+      }}
       onDoubleClick={(e) => {
         e.stopPropagation();
         drillIntoNode(node.id);
@@ -233,12 +262,12 @@ export const NodeCard: React.FC<NodeCardProps> = ({
           <div
             className="node-icon"
             style={{
-              backgroundColor: 'rgba(79, 70, 229, 0.08)',
-              color: 'var(--indigo)',
-              border: '1px solid rgba(79, 70, 229, 0.15)',
+              backgroundColor: 'var(--bg2)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
             }}
           >
-            <DynamicIcon name={typeDef.icon || 'Box'} size={14} color="var(--indigo)" />
+            <DynamicIcon name={typeDef.icon || 'Box'} size={12} color="var(--text)" />
           </div>
 
           <div className="node-title" title={node.name}>
@@ -249,10 +278,10 @@ export const NodeCard: React.FC<NodeCardProps> = ({
           <div
             title={`Status: ${node.status}`}
             style={{
-              width: '8px',
-              height: '8px',
+              width: '6px',
+              height: '6px',
               borderRadius: '50%',
-              backgroundColor: statusColor,
+              backgroundColor: getStatusColor(node.status),
               flexShrink: 0,
             }}
           />
@@ -273,96 +302,93 @@ export const NodeCard: React.FC<NodeCardProps> = ({
 
       {/* Footer */}
       <div className="node-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span className="tag type">{node.type}</span>
-          {node.priority === 'critical' && (
-            <span className="tag" style={{ background: '#fef2f2', color: '#e11d48', borderColor: '#fecdd3' }}>
-              critical
-            </span>
-          )}
-        </div>
+        <span className="tag type">{node.type}</span>
 
-        <div style={{ fontSize: '11px', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+        <div style={{ fontSize: '10px', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
           ● {depCount} • v{node.version || '0.1.0'}
         </div>
       </div>
 
       {/* Connection Handles (North, South, East, West) */}
-      <div className="handles">
+      <div className="handles" style={{ pointerEvents: 'none' }}>
         <div
           className="handle n"
-          title="Connect from Top"
+          title="Connect Top"
           onMouseDown={(e) => handleStartConnection(e, 'top')}
-          onMouseUp={(e) => handleMouseUpOnNode(e, 'top')}
+          onMouseUp={(e) => handleCompleteDrop(e, 'top')}
           style={{
             position: 'absolute',
             left: '50%',
             top: 0,
             transform: 'translate(-50%, -50%)',
-            width: '10px',
-            height: '10px',
+            width: '9px',
+            height: '9px',
             background: 'white',
             border: '2px solid var(--indigo)',
             borderRadius: '50%',
             cursor: 'crosshair',
-            opacity: isSelected ? 1 : 0.85,
+            pointerEvents: 'auto',
+            opacity: isSelected || isConnecting ? 1 : 0.6,
           }}
         />
         <div
           className="handle e"
-          title="Connect from Right"
+          title="Connect Right"
           onMouseDown={(e) => handleStartConnection(e, 'right')}
-          onMouseUp={(e) => handleMouseUpOnNode(e, 'right')}
+          onMouseUp={(e) => handleCompleteDrop(e, 'right')}
           style={{
             position: 'absolute',
             right: 0,
             top: '50%',
             transform: 'translate(50%, -50%)',
-            width: '10px',
-            height: '10px',
+            width: '9px',
+            height: '9px',
             background: 'white',
             border: '2px solid var(--indigo)',
             borderRadius: '50%',
             cursor: 'crosshair',
-            opacity: isSelected ? 1 : 0.85,
+            pointerEvents: 'auto',
+            opacity: isSelected || isConnecting ? 1 : 0.6,
           }}
         />
         <div
           className="handle s"
-          title="Connect from Bottom"
+          title="Connect Bottom"
           onMouseDown={(e) => handleStartConnection(e, 'bottom')}
-          onMouseUp={(e) => handleMouseUpOnNode(e, 'bottom')}
+          onMouseUp={(e) => handleCompleteDrop(e, 'bottom')}
           style={{
             position: 'absolute',
             left: '50%',
             bottom: 0,
             transform: 'translate(-50%, 50%)',
-            width: '10px',
-            height: '10px',
+            width: '9px',
+            height: '9px',
             background: 'white',
             border: '2px solid var(--indigo)',
             borderRadius: '50%',
             cursor: 'crosshair',
-            opacity: isSelected ? 1 : 0.85,
+            pointerEvents: 'auto',
+            opacity: isSelected || isConnecting ? 1 : 0.6,
           }}
         />
         <div
           className="handle w"
-          title="Connect from Left"
+          title="Connect Left"
           onMouseDown={(e) => handleStartConnection(e, 'left')}
-          onMouseUp={(e) => handleMouseUpOnNode(e, 'left')}
+          onMouseUp={(e) => handleCompleteDrop(e, 'left')}
           style={{
             position: 'absolute',
             left: 0,
             top: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '10px',
-            height: '10px',
+            width: '9px',
+            height: '9px',
             background: 'white',
             border: '2px solid var(--indigo)',
             borderRadius: '50%',
             cursor: 'crosshair',
-            opacity: isSelected ? 1 : 0.85,
+            pointerEvents: 'auto',
+            opacity: isSelected || isConnecting ? 1 : 0.6,
           }}
         />
       </div>
@@ -373,10 +399,10 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         onMouseDown={handleResizeMouseDown}
         style={{
           position: 'absolute',
-          right: '4px',
-          bottom: '4px',
-          width: '8px',
-          height: '8px',
+          right: '3px',
+          bottom: '3px',
+          width: '7px',
+          height: '7px',
           cursor: 'nwse-resize',
           opacity: isSelected ? 0.6 : 0.2,
           display: 'flex',
@@ -385,8 +411,8 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         }}
         title="Resize node"
       >
-        <svg width="6" height="6" viewBox="0 0 6 6" fill="none">
-          <path d="M5 1L1 5M5 3L3 5M5 5H5.01" stroke="#9aa0ad" strokeWidth="1" strokeLinecap="round" />
+        <svg width="5" height="5" viewBox="0 0 6 6" fill="none">
+          <path d="M5 1L1 5M5 3L3 5M5 5H5.01" stroke="#9ea5b1" strokeWidth="1" strokeLinecap="round" />
         </svg>
       </div>
     </div>

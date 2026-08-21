@@ -254,7 +254,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       setMarqueeBox(null);
     }
     if (pendingConnection) {
-      cancelPendingConnection();
+      setTimeout(() => {
+        if (useGraphStore.getState().pendingConnection) {
+          cancelPendingConnection();
+        }
+      }, 60);
     }
   };
 
