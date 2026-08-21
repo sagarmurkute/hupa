@@ -25,8 +25,18 @@ export const App: React.FC = () => {
     activeGraphId,
     updateMultipleNodePositions,
     zoomToFit,
+    toggleGrid,
     undo,
     redo,
+    selectedNodeIds,
+    selectedEdgeIds,
+    selectedGroupIds,
+    deleteNode,
+    deleteEdge,
+    deleteGroup,
+    clearSelection,
+    selectAll,
+    duplicateSelectedNodes,
     setCommandPaletteOpen,
     setNewNodeModalOpen,
     setNewProjectModalOpen,
@@ -34,6 +44,14 @@ export const App: React.FC = () => {
     setExportModalOpen,
     setStatsModalOpen,
     setShortcutsModalOpen,
+    isCommandPaletteOpen,
+    isNewNodeModalOpen,
+    isNewProjectModalOpen,
+    isCustomTypeModalOpen,
+    isExportModalOpen,
+    isStatsModalOpen,
+    isShortcutsModalOpen,
+    isRelationshipPickerOpen,
   } = useGraphStore();
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -50,38 +68,139 @@ export const App: React.FC = () => {
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const isInputActive =
+        (e.target as HTMLElement).tagName === 'INPUT' ||
+        (e.target as HTMLElement).tagName === 'TEXTAREA' ||
+        (e.target as HTMLElement).tagName === 'SELECT' ||
+        (e.target as HTMLElement).isContentEditable;
+
+      const anyModalOpen =
+        isCommandPaletteOpen ||
+        isNewNodeModalOpen ||
+        isNewProjectModalOpen ||
+        isCustomTypeModalOpen ||
+        isExportModalOpen ||
+        isStatsModalOpen ||
+        isShortcutsModalOpen ||
+        isRelationshipPickerOpen;
+
+      if (isInputActive) return;
+
       // Command palette: Ctrl+K or Cmd+K
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
         setCommandPaletteOpen(true);
+        return;
       }
-      // Shortcuts modal: '?'
-      if (e.key === '?' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+
+      // Select all: Ctrl+A / Cmd+A
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A') && !anyModalOpen) {
         e.preventDefault();
-        setShortcutsModalOpen(true);
+        selectAll();
+        return;
       }
+
+      // Duplicate: Ctrl+D / Cmd+D
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D') && !anyModalOpen) {
+        e.preventDefault();
+        duplicateSelectedNodes();
+        return;
+      }
+
       // Undo: Ctrl+Z
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
-        if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          undo();
-        }
+        e.preventDefault();
+        undo();
+        return;
       }
+
       // Redo: Ctrl+Shift+Z or Ctrl+Y
       if (
         ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) ||
         ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y'))
       ) {
-        if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
+      if (anyModalOpen) return;
+
+      // Shortcuts modal: '?'
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsModalOpen(true);
+        return;
+      }
+
+      // Delete selected: Delete or Backspace
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedNodeIds.length > 0 || selectedEdgeIds.length > 0 || selectedGroupIds.length > 0) {
           e.preventDefault();
-          redo();
+          selectedNodeIds.forEach((id) => deleteNode(id));
+          selectedEdgeIds.forEach((id) => deleteEdge(id));
+          selectedGroupIds.forEach((id) => deleteGroup(id));
+          clearSelection();
         }
+        return;
+      }
+
+      // Escape: clear selection
+      if (e.key === 'Escape') {
+        clearSelection();
+        return;
+      }
+
+      // Fit to screen: F
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        zoomToFit();
+        return;
+      }
+
+      // Toggle grid: G
+      if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        toggleGrid();
+        return;
+      }
+
+      // New Node: N
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        setNewNodeModalOpen(true);
+        return;
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [undo, redo, setCommandPaletteOpen, setShortcutsModalOpen]);
+  }, [
+    undo,
+    redo,
+    setCommandPaletteOpen,
+    setShortcutsModalOpen,
+    setNewNodeModalOpen,
+    selectedNodeIds,
+    selectedEdgeIds,
+    selectedGroupIds,
+    deleteNode,
+    deleteEdge,
+    deleteGroup,
+    clearSelection,
+    selectAll,
+    duplicateSelectedNodes,
+    zoomToFit,
+    toggleGrid,
+    isCommandPaletteOpen,
+    isNewNodeModalOpen,
+    isNewProjectModalOpen,
+    isCustomTypeModalOpen,
+    isExportModalOpen,
+    isStatsModalOpen,
+    isShortcutsModalOpen,
+    isRelationshipPickerOpen,
+  ]);
 
   // Auto Layout trigger
   const handleAutoLayout = useCallback(() => {

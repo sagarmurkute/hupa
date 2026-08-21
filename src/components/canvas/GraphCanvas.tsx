@@ -6,7 +6,7 @@ import { NodeCard } from './NodeCard';
 import { GroupCard } from './GroupCard';
 import { EdgeRenderer } from './EdgeRenderer';
 import { Minimap } from './Minimap';
-import { calculateBezierPath } from '../../utils/geometry';
+import { calculateBezierPath, getHandleCoordinates } from '../../utils/geometry';
 import {
   MousePointer,
   Hand,
@@ -193,6 +193,18 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
   // Canvas background mousedown for panning / marquee
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    // Only pan or marquee if clicking directly on the canvas background
+    const isDirectCanvasClick =
+      e.target === containerRef.current ||
+      (e.target as HTMLElement).classList.contains('canvas-viewport') ||
+      (e.target as HTMLElement).classList.contains('canvas-grid-matrix') ||
+      (e.target as HTMLElement).classList.contains('canvas-plane') ||
+      (e.target as HTMLElement).classList.contains('canvas-nodes-layer') ||
+      (e.target as HTMLElement).classList.contains('canvas-groups-layer') ||
+      (e.target as HTMLElement).tagName === 'svg';
+
+    if (!isDirectCanvasClick) return;
+
     if (e.button === 1 || (e.button === 0 && (isSpacePressed || activeTool === 'pan'))) {
       e.preventDefault();
       setIsPanning(true);
@@ -248,8 +260,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
       const enclosedNodeIds = filteredNodes
         .filter((n) => {
-          const w = n.size?.width || 240;
-          const h = n.size?.height || 76;
+          const w = n.size?.width || 230;
+          const h = n.size?.height || 96;
           const nCenterX = n.position.x + w / 2;
           const nCenterY = n.position.y + h / 2;
           return nCenterX >= minX && nCenterX <= maxX && nCenterY >= minY && nCenterY <= maxY;
@@ -273,27 +285,16 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   let pendingLinePath = '';
   if (pendingConnection && nodes[pendingConnection.sourceNodeId]) {
     const srcNode = nodes[pendingConnection.sourceNodeId];
-    const srcW = srcNode.size?.width || 240;
-    const srcH = srcNode.size?.height || 76;
-    const p1 = {
-      x:
-        pendingConnection.sourceHandle === 'right'
-          ? srcNode.position.x + srcW
-          : pendingConnection.sourceHandle === 'left'
-          ? srcNode.position.x
-          : srcNode.position.x + srcW / 2,
-      y:
-        pendingConnection.sourceHandle === 'bottom'
-          ? srcNode.position.y + srcH
-          : pendingConnection.sourceHandle === 'top'
-          ? srcNode.position.y
-          : srcNode.position.y + srcH / 2,
-    };
+    const srcW = srcNode.size?.width || 230;
+    const srcH = srcNode.size?.height || 96;
+    const srcSize = { width: srcW, height: srcH };
+    const p1 = getHandleCoordinates(srcNode.position, srcSize, pendingConnection.sourceHandle);
     const p2 = { x: pendingConnection.currentX, y: pendingConnection.currentY };
     pendingLinePath = calculateBezierPath(p1, p2, pendingConnection.sourceHandle, 'left').path;
   }
 
   const isPerspectiveFiltered = currentView && currentView.perspective !== 'all';
+  const allRelationshipTypes = { ...BUILTIN_RELATIONSHIP_TYPES, ...customRelationshipTypes };
 
   return (
     <div
@@ -303,7 +304,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onContextMenu={(e) => {
-        if (e.target === containerRef.current || (e.target as HTMLElement).tagName === 'svg') {
+        if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('canvas-viewport')) {
           e.preventDefault();
           onCanvasContextMenu(e);
         }
@@ -318,24 +319,36 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         style={{
           transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
           position: 'absolute',
-          inset: 0,
+          left: 0,
+          top: 0,
+          width: '100%',
+          height: '100%',
+          transformOrigin: '0 0',
           pointerEvents: 'none',
         }}
       >
-        {/* SVG Render Layer for Edges */}
+        {/* Layer 1: Groups Layer */}
+        <div className="canvas-groups-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          {filteredGroups.map((group) => (
+            <GroupCard key={group.id} group={group} isSelected={selectedGroupIds.includes(group.id)} />
+          ))}
+        </div>
+
+        {/* Layer 2: SVG Edges Layer */}
         <svg
+          className="canvas-edges-layer"
           style={{
             position: 'absolute',
-            width: '100000px',
-            height: '100000px',
-            left: '-50000px',
-            top: '-50000px',
+            left: 0,
+            top: 0,
+            width: '100%',
+            height: '100%',
             overflow: 'visible',
             pointerEvents: 'none',
           }}
         >
           <defs>
-            {Object.values(BUILTIN_RELATIONSHIP_TYPES).map((rel) => (
+            {Object.values(allRelationshipTypes).map((rel) => (
               <marker
                 key={rel.type}
                 id={`marker-${rel.type}`}
@@ -346,80 +359,69 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 markerHeight="6"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#0f172a" />
+                <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill={rel.color || '#0f172a'} />
               </marker>
             ))}
+            <marker
+              id="marker-default"
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#0f172a" />
+            </marker>
           </defs>
 
-          <g transform="translate(50000, 50000)" style={{ pointerEvents: 'auto' }}>
-            {/* Render Groups */}
-            {filteredGroups.map((group) => (
-              <foreignObject
-                key={group.id}
-                x={group.position.x}
-                y={group.position.y}
-                width={group.size.width}
-                height={group.size.height}
-                style={{ overflow: 'visible' }}
-              >
-                <GroupCard group={group} isSelected={selectedGroupIds.includes(group.id)} />
-              </foreignObject>
-            ))}
-
-            {/* Render Edges */}
-            {filteredEdges.map((edge) => {
-              const src = nodes[edge.sourceNodeId];
-              const tgt = nodes[edge.targetNodeId];
-              if (!src || !tgt) return null;
-              return (
-                <EdgeRenderer
-                  key={edge.id}
-                  edge={edge}
-                  sourceNode={src}
-                  targetNode={tgt}
-                  customType={customRelationshipTypes[edge.type]}
-                  isSelected={selectedEdgeIds.includes(edge.id)}
-                  onSelect={selectEdge}
-                  onContextMenu={onEdgeContextMenu}
-                />
-              );
-            })}
-
-            {/* Active Live Dragging Connection Curve */}
-            {pendingConnection && (
-              <path
-                d={pendingLinePath}
-                fill="none"
-                stroke="#4f46e5"
-                strokeWidth={2}
-                strokeDasharray="4, 3"
-                markerEnd="url(#marker-uses)"
-                style={{ filter: 'drop-shadow(0 2px 6px rgba(79, 70, 229, 0.3))' }}
+          {/* Render Edges */}
+          {filteredEdges.map((edge) => {
+            const src = nodes[edge.sourceNodeId];
+            const tgt = nodes[edge.targetNodeId];
+            if (!src || !tgt) return null;
+            return (
+              <EdgeRenderer
+                key={edge.id}
+                edge={edge}
+                sourceNode={src}
+                targetNode={tgt}
+                customType={customRelationshipTypes[edge.type]}
+                isSelected={selectedEdgeIds.includes(edge.id)}
+                onSelect={selectEdge}
+                onContextMenu={onEdgeContextMenu}
               />
-            )}
+            );
+          })}
 
-            {/* Render Nodes */}
-            {filteredNodes.map((node) => (
-              <foreignObject
-                key={node.id}
-                x={node.position.x}
-                y={node.position.y}
-                width={node.size?.width || 240}
-                height={node.size?.height || 76}
-                style={{ overflow: 'visible' }}
-              >
-                <NodeCard
-                  node={node}
-                  customType={customNodeTypes[node.type]}
-                  isSelected={selectedNodeIds.includes(node.id)}
-                  onContextMenu={onNodeContextMenu}
-                />
-              </foreignObject>
-            ))}
-          </g>
+          {/* Active Live Dragging Connection Curve */}
+          {pendingConnection && (
+            <path
+              d={pendingLinePath}
+              fill="none"
+              stroke="#4f46e5"
+              strokeWidth={2}
+              strokeDasharray="4, 3"
+              markerEnd="url(#marker-uses)"
+              style={{ filter: 'drop-shadow(0 2px 6px rgba(79, 70, 229, 0.3))' }}
+            />
+          )}
         </svg>
 
-        {/* Marquee Selection Bounding Box */}
+        {/* Layer 3: Nodes Layer (DOM elements with full direct interactivity!) */}
+        <div className="canvas-nodes-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          {filteredNodes.map((node) => (
+            <NodeCard
+              key={node.id}
+              node={node}
+              customType={customNodeTypes[node.type]}
+              isSelected={selectedNodeIds.includes(node.id)}
+              onContextMenu={onNodeContextMenu}
+            />
+          ))}
+        </div>
+
+        {/* Layer 4: Marquee Selection Bounding Box */}
         {isMarquee && marqueeBox && (
           <div
             style={{
@@ -429,8 +431,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               width: `${Math.abs(marqueeBox.currentX - marqueeBox.startX)}px`,
               height: `${Math.abs(marqueeBox.currentY - marqueeBox.startY)}px`,
               border: '1px solid #0f172a',
-              backgroundColor: 'rgba(15, 23, 42, 0.04)',
-              borderRadius: '3px',
+              backgroundColor: 'rgba(15, 23, 42, 0.05)',
+              borderRadius: '4px',
               pointerEvents: 'none',
               zIndex: 60,
             }}
@@ -453,35 +455,35 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         >
           <div
             style={{
-              padding: '24px 30px',
+              padding: '28px 32px',
               backgroundColor: '#ffffff',
-              borderRadius: '10px',
+              borderRadius: '12px',
               border: '1px solid var(--border-subtle)',
-              boxShadow: 'var(--shadow-drawer)',
+              boxShadow: 'var(--shadow-dialog)',
               pointerEvents: 'auto',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               textAlign: 'center',
-              gap: '10px',
-              maxWidth: '340px',
+              gap: '12px',
+              maxWidth: '360px',
             }}
           >
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {isPerspectiveFiltered ? `Perspective: ${currentView?.name}` : 'Spatial Graph Canvas'}
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {isPerspectiveFiltered ? `Perspective: ${currentView?.name}` : 'Spatial Architecture Canvas'}
             </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.45' }}>
               {isPerspectiveFiltered
                 ? 'No architectural nodes match this perspective filter.'
                 : 'Represent and architect software systems by plotting nodes or deploying a starter template.'}
             </div>
-            <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
               {isPerspectiveFiltered ? (
                 <button
                   onClick={() => setActiveView('view-all')}
                   className="hupa-btn primary"
                 >
-                  <Layers size={12} /> Switch to Unified View
+                  <Layers size={13} /> Switch to Unified View
                 </button>
               ) : (
                 <>
@@ -489,13 +491,13 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                     onClick={() => setNewNodeModalOpen(true)}
                     className="hupa-btn primary"
                   >
-                    <Plus size={12} /> Add First Node
+                    <Plus size={13} /> Add First Node
                   </button>
                   <button
                     onClick={() => resetToTemplate('fullstack-web')}
                     className="hupa-btn"
                   >
-                    Deploy Fullstack Template
+                    Deploy Fullstack
                   </button>
                 </>
               )}

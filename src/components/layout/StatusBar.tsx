@@ -32,8 +32,8 @@ export const StatusBar: React.FC = () => {
   return (
     <footer className="statusbar">
       {/* Left: Active Graph & Selection State */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span
             style={{
               width: '6px',
@@ -56,7 +56,7 @@ export const StatusBar: React.FC = () => {
       </div>
 
       {/* Right: Metrics, Active View, Zoom, Storage Status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div>
           <span>Graph: </span>
           <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{currentNodes.length}</strong> nodes,{' '}
@@ -84,11 +84,11 @@ export const StatusBar: React.FC = () => {
 
         <div
           title="Local persistence active (instant state auto-saving)"
-          style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#0f172a', fontWeight: 500 }}
+          style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary)', fontWeight: 500 }}
         >
           <Database size={11} />
           <span style={{ fontSize: '10px' }}>Local Sync</span>
-          <CheckCircle2 size={11} />
+          <CheckCircle2 size={11} color="var(--status-completed)" />
         </div>
       </div>
     </footer>

@@ -1,325 +1,277 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { BUILTIN_NODE_TYPES } from '../../constants/nodeTypes';
-import { BUILTIN_RELATIONSHIP_TYPES } from '../../constants/relationshipTypes';
 import { DynamicIcon } from '../common/DynamicIcon';
+import { CustomSelect } from '../common/CustomSelect';
+import { CustomTagInput } from '../common/CustomTagInput';
+import { CustomFieldsEditor } from '../common/CustomFieldsEditor';
 import {
-  ChevronRight,
-  Plus,
-  Trash2,
+  Layers,
+  FileText,
   GitFork,
-  ArrowRight,
-  ArrowLeftRight,
+  Trash2,
+  Sliders,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
+import type { NodeStatus, NodePriority } from '../../types/graph';
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active', color: '#059669', badge: 'RUNNING' },
+  { value: 'in-progress', label: 'In Progress', color: '#d97706', badge: 'DEV' },
+  { value: 'planned', label: 'Planned', color: '#64748b', badge: 'ROADMAP' },
+  { value: 'review', label: 'Review', color: '#2563eb', badge: 'QA' },
+  { value: 'completed', label: 'Completed', color: '#059669', badge: 'DONE' },
+  { value: 'blocked', label: 'Blocked', color: '#e11d48', badge: 'ISSUE' },
+  { value: 'deprecated', label: 'Deprecated', color: '#94a3b8', badge: 'LEGACY' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Low', color: '#94a3b8' },
+  { value: 'medium', label: 'Medium', color: '#3b82f6' },
+  { value: 'high', label: 'High', color: '#f59e0b', badge: 'HIGH' },
+  { value: 'critical', label: 'Critical', color: '#ef4444', badge: 'CRITICAL' },
+];
 
 export const NodeInspector: React.FC = () => {
   const {
-    nodes,
-    edges,
-    graphs,
-    activeGraphId,
-    projects,
-    activeProjectId,
-    selectedNodeIds,
-    selectedEdgeIds,
-    updateNode,
-    deleteNode,
-    updateEdge,
-    deleteEdge,
-    drillIntoNode,
-    selectNode,
-    setTransform,
     isInspectorOpen,
     setInspectorOpen,
     inspectorTab,
     setInspectorTab,
+    selectedNodeIds,
+    nodes,
+    edges,
+    updateNode,
+    deleteNode,
+    selectNode,
+    drillIntoNode,
     customNodeTypes,
-    customRelationshipTypes,
-    setNewNodeModalOpen,
   } = useGraphStore();
 
-  const [activeDocPreview, setActiveDocPreview] = useState(false);
-  const [newPropKey, setNewPropKey] = useState('');
-  const [newPropVal, setNewPropVal] = useState('');
-
-  if (!isInspectorOpen) return null;
-
-  const activeProject = projects[activeProjectId] || { name: 'HUPA Platform' };
-  const currentGraph = graphs[activeGraphId] || { name: 'System Root' };
-  const currentNodes = Object.values(nodes).filter((n) => n.graphId === activeGraphId);
-  const currentEdges = Object.values(edges).filter((e) => e.graphId === activeGraphId);
-
-  // Single Node Selected
-  const selectedNode = selectedNodeIds.length === 1 ? nodes[selectedNodeIds[0]] : null;
-  // Single Edge Selected
-  const selectedEdge = selectedEdgeIds.length === 1 ? edges[selectedEdgeIds[0]] : null;
-
-  // Jump canvas to a node
-  const handleJumpToNode = (nodeId: string) => {
-    selectNode(nodeId);
-    const targetNode = nodes[nodeId];
-    if (targetNode) {
-      setTransform((prev) => ({
-        x: window.innerWidth / 2 - (targetNode.position.x + (targetNode.size?.width || 240) / 2) * prev.zoom,
-        y: window.innerHeight / 2 - (targetNode.position.y + (targetNode.size?.height || 76) / 2) * prev.zoom,
-        zoom: Math.max(0.85, prev.zoom),
-      }));
-    }
-  };
-
-  // 1. NOTHING SELECTED — PROJECT & GRAPH CONTEXT
-  if (!selectedNode && !selectedEdge) {
+  // 1. MINIMIZED SLIM DOCK (When Inspector is Closed)
+  if (!isInspectorOpen) {
     return (
-      <aside className="drawer-panel right-drawer" style={{ width: 'var(--inspector-width)' }}>
-        <div className="drawer-header">
-          <span>Graph Context</span>
+      <aside
+        className="inspector-panel"
+        style={{
+          width: '38px',
+          minWidth: '38px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '6px 0',
+          gap: '6px',
+        }}
+        aria-label="Collapsed Inspector Panel"
+      >
+        <button
+          onClick={() => setInspectorOpen(true)}
+          className="hupa-btn ghost icon-only"
+          style={{ width: '28px', height: '28px' }}
+          title="Expand Node Inspector"
+          aria-label="Expand Inspector"
+        >
+          <PanelRightOpen size={14} color="var(--text-secondary)" />
+        </button>
+
+        <div style={{ width: '16px', height: '1px', backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
+
+        <span
+          style={{
+            writingMode: 'vertical-rl',
+            textOrientation: 'mixed',
+            fontSize: '9.5px',
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--text-muted)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            marginTop: '8px',
+            userSelect: 'none',
+          }}
+        >
+          INSPECTOR
+        </span>
+      </aside>
+    );
+  }
+
+  const selectedNodeId = selectedNodeIds[0];
+  const selectedNode = selectedNodeId ? nodes[selectedNodeId] : null;
+
+  // 2. OPEN INSPECTOR WITH EMPTY STATE
+  if (!selectedNode) {
+    return (
+      <aside className="inspector-panel">
+        <div
+          style={{
+            padding: '12px 14px',
+            borderBottom: '1px solid var(--border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'var(--surface-subtle)',
+          }}
+        >
+          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+            Node Inspector
+          </span>
           <button
             onClick={() => setInspectorOpen(false)}
             className="hupa-btn ghost icon-only"
             style={{ width: '22px', height: '22px' }}
+            title="Collapse Inspector"
           >
-            <ChevronRight size={13} />
+            <PanelRightClose size={13} />
           </button>
         </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {currentGraph.name}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Project: {activeProject.name}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            <div style={{ padding: '8px', backgroundColor: 'var(--surface-subtle)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                {currentNodes.length}
-              </div>
-              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Nodes</div>
-            </div>
-
-            <div style={{ padding: '8px', backgroundColor: 'var(--surface-subtle)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                {currentEdges.length}
-              </div>
-              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Relationships</div>
-            </div>
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
-              Quick Graph Actions
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <button
-                onClick={() => setNewNodeModalOpen(true)}
-                className="hupa-btn"
-                style={{ width: '100%', justifyContent: 'flex-start' }}
-              >
-                <Plus size={12} /> Add Architectural Node
-              </button>
-            </div>
-          </div>
+        <div
+          style={{
+            padding: '28px 16px',
+            textAlign: 'center',
+            color: 'var(--text-muted)',
+            fontSize: '11.5px',
+            lineHeight: '1.5',
+          }}
+        >
+          Select an architectural node on the canvas to inspect and edit properties.
         </div>
       </aside>
     );
   }
 
-  // 2. EDGE SELECTED — RELATIONSHIP INSPECTOR
-  if (selectedEdge) {
-    const src = nodes[selectedEdge.sourceNodeId];
-    const tgt = nodes[selectedEdge.targetNodeId];
-    const relDef = customRelationshipTypes[selectedEdge.type] || BUILTIN_RELATIONSHIP_TYPES[selectedEdge.type] || BUILTIN_RELATIONSHIP_TYPES.uses;
+  // 3. OPEN INSPECTOR WITH ACTIVE NODE
+  const allNodeTypes = { ...BUILTIN_NODE_TYPES, ...customNodeTypes };
+  const typeDef = allNodeTypes[selectedNode.type] || BUILTIN_NODE_TYPES.custom;
 
-    return (
-      <aside className="drawer-panel right-drawer" style={{ width: 'var(--inspector-width)' }}>
-        <div className="drawer-header">
-          <span>Relationship Spec</span>
-          <button
-            onClick={() => setInspectorOpen(false)}
-            className="hupa-btn ghost icon-only"
-            style={{ width: '22px', height: '22px' }}
-          >
-            <ChevronRight size={13} />
-          </button>
-        </div>
+  const typeOptions = Object.values(allNodeTypes).map((t) => ({
+    value: t.type,
+    label: t.label,
+    icon: t.icon,
+    description: t.description,
+  }));
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Source -> Target */}
+  const incomingEdges = Object.values(edges).filter((e) => e.targetNodeId === selectedNode.id);
+  const outgoingEdges = Object.values(edges).filter((e) => e.sourceNodeId === selectedNode.id);
+
+  const tabs: { id: typeof inspectorTab; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
+    { id: 'overview', label: 'Spec', icon: Layers },
+    { id: 'relations', label: `Rels (${incomingEdges.length + outgoingEdges.length})`, icon: GitFork },
+    { id: 'properties', label: 'Props', icon: Sliders },
+    { id: 'docs', label: 'Docs', icon: FileText },
+  ];
+
+  const handleJumpToNode = (targetId: string) => {
+    selectNode(targetId);
+  };
+
+  return (
+    <aside className="inspector-panel" aria-label="Node Inspector Panel">
+      {/* Header */}
+      <div
+        style={{
+          padding: '12px 14px',
+          borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: 'var(--surface-subtle)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <div
             style={{
-              padding: '10px',
-              backgroundColor: 'var(--surface-subtle)',
+              width: '24px',
+              height: '24px',
               borderRadius: '6px',
+              backgroundColor: '#ffffff',
               border: '1px solid var(--border-subtle)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '11.5px',
+              justifyContent: 'center',
+              flexShrink: 0,
             }}
           >
-            <span style={{ fontWeight: 600 }}>{src?.name || selectedEdge.sourceNodeId}</span>
-            <ArrowRight size={12} color="var(--text-muted)" />
-            <span style={{ fontWeight: 600 }}>{tgt?.name || selectedEdge.targetNodeId}</span>
+            <DynamicIcon name={typeDef.icon || 'Box'} size={13} color={typeDef.color || '#0f172a'} />
           </div>
-
-          {/* Relationship Type */}
-          <div>
-            <label style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-              Semantic Type
-            </label>
-            <select
-              value={selectedEdge.type}
-              onChange={(e) => {
-                const newType = e.target.value;
-                const def = BUILTIN_RELATIONSHIP_TYPES[newType];
-                updateEdge(selectedEdge.id, {
-                  type: newType,
-                  label: def ? def.label : newType,
-                });
-              }}
+          <div style={{ minWidth: 0 }}>
+            <div
               style={{
-                width: '100%',
-                height: '28px',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '5px',
-                padding: '0 8px',
-                fontSize: '11.5px',
-                backgroundColor: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
-              {Object.values(BUILTIN_RELATIONSHIP_TYPES).map((r) => (
-                <option key={r.type} value={r.type}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Custom Label */}
-          <div>
-            <label style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-              Pill Label
-            </label>
-            <input
-              value={selectedEdge.label || ''}
-              onChange={(e) => updateEdge(selectedEdge.id, { label: e.target.value })}
-              placeholder={relDef.label}
-              style={{
-                width: '100%',
-                height: '28px',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '5px',
-                padding: '0 8px',
-                fontSize: '11.5px',
-                backgroundColor: '#ffffff',
-              }}
-            />
-          </div>
-
-          {/* Swap Direction & Delete Actions */}
-          <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-            <button
-              onClick={() =>
-                updateEdge(selectedEdge.id, {
-                  sourceNodeId: selectedEdge.targetNodeId,
-                  targetNodeId: selectedEdge.sourceNodeId,
-                })
-              }
-              className="hupa-btn"
-              style={{ flex: 1 }}
-            >
-              <ArrowLeftRight size={12} /> Swap Direction
-            </button>
-
-            <button
-              onClick={() => deleteEdge(selectedEdge.id)}
-              className="hupa-btn"
-              style={{ color: '#e11d48' }}
-            >
-              <Trash2 size={12} />
-            </button>
+              {selectedNode.name}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              {typeDef.label} • v{selectedNode.version || '1.0.0'}
+            </div>
           </div>
         </div>
-      </aside>
-    );
-  }
 
-  // 3. NODE SELECTED — PRECISION NODE INSPECTOR
-  if (!selectedNode) return null;
-
-  const typeDef = customNodeTypes[selectedNode.type] || BUILTIN_NODE_TYPES[selectedNode.type] || BUILTIN_NODE_TYPES.custom;
-  const incomingEdges = currentEdges.filter((e) => e.targetNodeId === selectedNode.id);
-  const outgoingEdges = currentEdges.filter((e) => e.sourceNodeId === selectedNode.id);
-
-  return (
-    <aside className="drawer-panel right-drawer" style={{ width: 'var(--inspector-width)' }}>
-      {/* Header */}
-      <div className="drawer-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <DynamicIcon name={typeDef.icon || 'Box'} size={12} color="var(--text-secondary)" />
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-            {selectedNode.name}
-          </span>
-        </div>
         <button
           onClick={() => setInspectorOpen(false)}
           className="hupa-btn ghost icon-only"
           style={{ width: '22px', height: '22px' }}
+          title="Collapse Inspector"
         >
-          <ChevronRight size={13} />
+          <PanelRightClose size={13} />
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs Switcher */}
       <div
         style={{
           display: 'flex',
           borderBottom: '1px solid var(--border-subtle)',
-          backgroundColor: 'var(--surface-subtle)',
-          padding: '4px 8px',
+          padding: '4px 6px',
           gap: '2px',
+          backgroundColor: '#ffffff',
         }}
       >
-        {[
-          { id: 'overview', label: 'Spec' },
-          { id: 'relations', label: `Rels (${incomingEdges.length + outgoingEdges.length})` },
-          { id: 'properties', label: 'Props' },
-          { id: 'docs', label: 'Docs' },
-        ].map((tab) => {
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
           const isActive = inspectorTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setInspectorTab(tab.id as any)}
+              onClick={() => setInspectorTab(tab.id)}
               style={{
                 flex: 1,
-                padding: '3px 4px',
+                padding: '4px 6px',
                 fontSize: '11px',
-                fontWeight: isActive ? 600 : 500,
-                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                backgroundColor: isActive ? '#ffffff' : 'transparent',
-                border: isActive ? '1px solid var(--border-subtle)' : '1px solid transparent',
+                fontWeight: isActive ? 600 : 400,
                 borderRadius: '4px',
+                border: 'none',
+                backgroundColor: isActive ? 'var(--surface-subtle)' : 'transparent',
+                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
                 cursor: 'pointer',
+                transition: 'all 0.1s ease',
               }}
             >
-              {tab.label}
+              <Icon size={11} />
+              <span>{tab.label}</span>
             </button>
           );
         })}
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-        {/* TAB: OVERVIEW */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
+        {/* TAB: SPEC / OVERVIEW */}
         {inspectorTab === 'overview' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
-                Node Name
+              <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                Node Identifier
               </label>
               <input
                 value={selectedNode.name}
@@ -333,65 +285,74 @@ export const NodeInspector: React.FC = () => {
                   fontSize: '12px',
                   fontWeight: 600,
                   backgroundColor: '#ffffff',
+                  outline: 'none',
                 }}
               />
             </div>
 
+            {/* Type & Status using CustomSelect */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div>
-                <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
-                  Type
+                <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                  Component Type
                 </label>
-                <select
+                <CustomSelect
                   value={selectedNode.type}
-                  onChange={(e) => updateNode(selectedNode.id, { type: e.target.value as any })}
-                  style={{
-                    width: '100%',
-                    height: '28px',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '5px',
-                    padding: '0 6px',
-                    fontSize: '11.5px',
-                    backgroundColor: '#ffffff',
-                  }}
-                >
-                  {Object.values(BUILTIN_NODE_TYPES).map((t) => (
-                    <option key={t.type} value={t.type}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                  options={typeOptions}
+                  onChange={(val) => updateNode(selectedNode.id, { type: val as any })}
+                />
               </div>
 
               <div>
-                <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
+                <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
                   Status
                 </label>
-                <select
+                <CustomSelect
                   value={selectedNode.status}
-                  onChange={(e) => updateNode(selectedNode.id, { status: e.target.value as any })}
-                  style={{
-                    width: '100%',
-                    height: '28px',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '5px',
-                    padding: '0 6px',
-                    fontSize: '11.5px',
-                    backgroundColor: '#ffffff',
-                  }}
-                >
-                  <option value="planned">Planned</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="review">Review</option>
-                  <option value="completed">Completed</option>
-                  <option value="deprecated">Deprecated</option>
-                  <option value="blocked">Blocked</option>
-                </select>
+                  options={STATUS_OPTIONS}
+                  onChange={(val) => updateNode(selectedNode.id, { status: val as NodeStatus })}
+                />
               </div>
             </div>
 
+            {/* Priority & Owner using CustomSelect */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div>
+                <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                  Priority
+                </label>
+                <CustomSelect
+                  value={selectedNode.priority || 'medium'}
+                  options={PRIORITY_OPTIONS}
+                  onChange={(val) => updateNode(selectedNode.id, { priority: val as NodePriority })}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                  Owner / Lead
+                </label>
+                <input
+                  value={selectedNode.owner || ''}
+                  onChange={(e) => updateNode(selectedNode.id, { owner: e.target.value })}
+                  placeholder="e.g. backend-team"
+                  style={{
+                    width: '100%',
+                    height: '28px',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '5px',
+                    padding: '0 8px',
+                    fontSize: '11.5px',
+                    backgroundColor: '#ffffff',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Description */}
             <div>
-              <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
+              <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
                 Description
               </label>
               <textarea
@@ -407,12 +368,24 @@ export const NodeInspector: React.FC = () => {
                   resize: 'vertical',
                   lineHeight: '1.4',
                   backgroundColor: '#ffffff',
+                  outline: 'none',
                 }}
               />
             </div>
 
+            {/* Custom Tag Input */}
+            <div>
+              <label style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                Tech Stack / Tags
+              </label>
+              <CustomTagInput
+                tags={selectedNode.tags || []}
+                onChange={(newTags) => updateNode(selectedNode.id, { tags: newTags })}
+              />
+            </div>
+
             {/* Subsystem graph drill-down button */}
-            <div style={{ paddingTop: '6px' }}>
+            <div style={{ paddingTop: '4px' }}>
               <button
                 onClick={() => drillIntoNode(selectedNode.id)}
                 className="hupa-btn"
@@ -423,11 +396,11 @@ export const NodeInspector: React.FC = () => {
               </button>
             </div>
 
-            <div style={{ paddingTop: '4px' }}>
+            <div style={{ paddingTop: '2px' }}>
               <button
                 onClick={() => deleteNode(selectedNode.id)}
-                className="hupa-btn ghost"
-                style={{ width: '100%', justifyContent: 'center', color: '#e11d48' }}
+                className="hupa-btn danger"
+                style={{ width: '100%', justifyContent: 'center' }}
               >
                 <Trash2 size={12} /> Delete Node
               </button>
@@ -437,9 +410,9 @@ export const NodeInspector: React.FC = () => {
 
         {/* TAB: RELATIONS */}
         {inspectorTab === 'relations' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
                 Incoming Connections ({incomingEdges.length})
               </div>
               {incomingEdges.map((e) => {
@@ -452,16 +425,19 @@ export const NodeInspector: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '5px 8px',
-                      borderRadius: '4px',
+                      padding: '6px 8px',
+                      borderRadius: '5px',
                       backgroundColor: 'var(--surface-subtle)',
                       border: '1px solid var(--border-subtle)',
                       marginBottom: '4px',
                       cursor: 'pointer',
-                      fontSize: '11px',
+                      fontSize: '11.5px',
+                      transition: 'background-color 0.1s ease',
                     }}
+                    onMouseEnter={(ev) => (ev.currentTarget.style.backgroundColor = 'var(--surface-hover)')}
+                    onMouseLeave={(ev) => (ev.currentTarget.style.backgroundColor = 'var(--surface-subtle)')}
                   >
-                    <span>{s?.name || e.sourceNodeId}</span>
+                    <span style={{ fontWeight: 500 }}>{s?.name || e.sourceNodeId}</span>
                     <span style={{ fontSize: '9.5px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
                       {e.label || e.type}
                     </span>
@@ -469,14 +445,14 @@ export const NodeInspector: React.FC = () => {
                 );
               })}
               {incomingEdges.length === 0 && (
-                <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
                   No incoming relationships
                 </div>
               )}
             </div>
 
-            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
                 Outgoing Connections ({outgoingEdges.length})
               </div>
               {outgoingEdges.map((e) => {
@@ -489,16 +465,19 @@ export const NodeInspector: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '5px 8px',
-                      borderRadius: '4px',
+                      padding: '6px 8px',
+                      borderRadius: '5px',
                       backgroundColor: 'var(--surface-subtle)',
                       border: '1px solid var(--border-subtle)',
                       marginBottom: '4px',
                       cursor: 'pointer',
-                      fontSize: '11px',
+                      fontSize: '11.5px',
+                      transition: 'background-color 0.1s ease',
                     }}
+                    onMouseEnter={(ev) => (ev.currentTarget.style.backgroundColor = 'var(--surface-hover)')}
+                    onMouseLeave={(ev) => (ev.currentTarget.style.backgroundColor = 'var(--surface-subtle)')}
                   >
-                    <span>{t?.name || e.targetNodeId}</span>
+                    <span style={{ fontWeight: 500 }}>{t?.name || e.targetNodeId}</span>
                     <span style={{ fontSize: '9.5px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
                       {e.label || e.type}
                     </span>
@@ -506,7 +485,7 @@ export const NodeInspector: React.FC = () => {
                 );
               })}
               {outgoingEdges.length === 0 && (
-                <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
                   No outgoing relationships
                 </div>
               )}
@@ -517,150 +496,37 @@ export const NodeInspector: React.FC = () => {
         {/* TAB: PROPERTIES */}
         {inspectorTab === 'properties' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Custom Property Store
-            </div>
-            {Object.entries(selectedNode.properties || {}).map(([key, val]) => (
-              <div key={key} style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                <input
-                  disabled
-                  value={key}
-                  style={{
-                    flex: 1,
-                    height: '24px',
-                    fontSize: '11px',
-                    fontFamily: 'var(--font-mono)',
-                    padding: '0 6px',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--surface-subtle)',
-                  }}
-                />
-                <input
-                  value={String(val)}
-                  onChange={(e) => {
-                    const nextProps = { ...selectedNode.properties, [key]: e.target.value };
-                    updateNode(selectedNode.id, { properties: nextProps });
-                  }}
-                  style={{
-                    flex: 1,
-                    height: '24px',
-                    fontSize: '11px',
-                    padding: '0 6px',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '4px',
-                    backgroundColor: '#ffffff',
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    const nextProps = { ...selectedNode.properties };
-                    delete nextProps[key];
-                    updateNode(selectedNode.id, { properties: nextProps });
-                  }}
-                  className="hupa-btn ghost icon-only"
-                  style={{ width: '20px', height: '20px', color: '#e11d48' }}
-                >
-                  <Trash2 size={11} />
-                </button>
-              </div>
-            ))}
-
-            {/* Add Property Row */}
-            <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-              <input
-                placeholder="Key"
-                value={newPropKey}
-                onChange={(e) => setNewPropKey(e.target.value)}
-                style={{
-                  flex: 1,
-                  height: '24px',
-                  fontSize: '11px',
-                  padding: '0 6px',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '4px',
-                }}
-              />
-              <input
-                placeholder="Value"
-                value={newPropVal}
-                onChange={(e) => setNewPropVal(e.target.value)}
-                style={{
-                  flex: 1,
-                  height: '24px',
-                  fontSize: '11px',
-                  padding: '0 6px',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '4px',
-                }}
-              />
-              <button
-                onClick={() => {
-                  if (newPropKey.trim()) {
-                    const nextProps = { ...selectedNode.properties, [newPropKey.trim()]: newPropVal };
-                    updateNode(selectedNode.id, { properties: nextProps });
-                    setNewPropKey('');
-                    setNewPropVal('');
-                  }
-                }}
-                className="hupa-btn primary"
-                style={{ height: '24px', padding: '0 6px' }}
-              >
-                <Plus size={11} />
-              </button>
-            </div>
+            <CustomFieldsEditor
+              properties={selectedNode.properties || {}}
+              onChange={(nextProps) => updateNode(selectedNode.id, { properties: nextProps })}
+            />
           </div>
         )}
 
-        {/* TAB: DOCS */}
+        {/* TAB: DOCUMENTATION */}
         {inspectorTab === 'docs' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Markdown Spec
-              </span>
-              <button
-                onClick={() => setActiveDocPreview(!activeDocPreview)}
-                className="hupa-btn ghost"
-                style={{ height: '20px', padding: '0 6px', fontSize: '10px' }}
-              >
-                {activeDocPreview ? 'Edit Raw' : 'Preview'}
-              </button>
+            <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Architectural Specification
             </div>
-
-            {activeDocPreview ? (
-              <div
-                style={{
-                  padding: '8px',
-                  backgroundColor: 'var(--surface-subtle)',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: '11px',
-                  lineHeight: '1.4',
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {selectedNode.documentation || `# ${selectedNode.name}\n\n${selectedNode.description || ''}`}
-              </div>
-            ) : (
-              <textarea
-                value={selectedNode.documentation || ''}
-                onChange={(e) => updateNode(selectedNode.id, { documentation: e.target.value })}
-                placeholder={`# ${selectedNode.name}\n\nTechnical specification and architecture notes...`}
-                rows={10}
-                style={{
-                  width: '100%',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '5px',
-                  padding: '6px 8px',
-                  fontSize: '11px',
-                  fontFamily: 'var(--font-mono)',
-                  resize: 'vertical',
-                  lineHeight: '1.4',
-                  backgroundColor: '#ffffff',
-                }}
-              />
-            )}
+            <textarea
+              value={selectedNode.documentation || ''}
+              onChange={(e) => updateNode(selectedNode.id, { documentation: e.target.value })}
+              placeholder="# System Architecture&#10;Write comprehensive markdown documentation, API specifications, RFC notes..."
+              rows={12}
+              style={{
+                width: '100%',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '5px',
+                padding: '8px',
+                fontSize: '11.5px',
+                fontFamily: 'var(--font-mono)',
+                lineHeight: '1.5',
+                resize: 'vertical',
+                backgroundColor: '#ffffff',
+                outline: 'none',
+              }}
+            />
           </div>
         )}
       </div>

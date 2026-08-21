@@ -1,9 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
-import { BUILTIN_NODE_TYPES, CATEGORY_LABELS } from '../../constants/nodeTypes';
-import { DynamicIcon } from '../common/DynamicIcon';
+import { BUILTIN_NODE_TYPES } from '../../constants/nodeTypes';
+import { CustomSelect } from '../common/CustomSelect';
+import { CustomTagInput } from '../common/CustomTagInput';
 import { Plus, X, Box } from 'lucide-react';
 import type { NodeStatus, NodePriority } from '../../types/graph';
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active', color: '#059669', badge: 'RUNNING' },
+  { value: 'in-progress', label: 'In Progress', color: '#d97706', badge: 'DEV' },
+  { value: 'planned', label: 'Planned', color: '#64748b', badge: 'ROADMAP' },
+  { value: 'review', label: 'Review', color: '#2563eb', badge: 'QA' },
+  { value: 'completed', label: 'Completed', color: '#059669', badge: 'DONE' },
+  { value: 'blocked', label: 'Blocked', color: '#e11d48', badge: 'ISSUE' },
+  { value: 'deprecated', label: 'Deprecated', color: '#94a3b8', badge: 'LEGACY' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Low', color: '#94a3b8' },
+  { value: 'medium', label: 'Medium', color: '#3b82f6' },
+  { value: 'high', label: 'High', color: '#f59e0b', badge: 'HIGH' },
+  { value: 'critical', label: 'Critical', color: '#ef4444', badge: 'CRITICAL' },
+];
 
 export const NewNodeModal: React.FC = () => {
   const {
@@ -14,21 +32,35 @@ export const NewNodeModal: React.FC = () => {
     customNodeTypes,
   } = useGraphStore();
 
-  const [selectedType, setSelectedType] = useState<string>('service');
   const [name, setName] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string>('service');
   const [description, setDescription] = useState<string>('');
-  const [status, setStatus] = useState<NodeStatus>('planned');
+  const [tags, setTags] = useState<string[]>([]);
+  const [owner, setOwner] = useState<string>('');
+  const [status, setStatus] = useState<NodeStatus>('active');
   const [priority, setPriority] = useState<NodePriority>('medium');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setNewNodeModalOpen(false);
+      }
+    };
+    if (isNewNodeModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isNewNodeModalOpen, setNewNodeModalOpen]);
 
   if (!isNewNodeModalOpen) return null;
 
   const allTypes = { ...BUILTIN_NODE_TYPES, ...customNodeTypes };
-
-  const filteredTypes = Object.values(allTypes).filter((t) => {
-    if (categoryFilter === 'all') return true;
-    return t.category === categoryFilter;
-  });
+  const typeOptions = Object.values(allTypes).map((t) => ({
+    value: t.type,
+    label: t.label,
+    icon: t.icon,
+    description: t.description,
+  }));
 
   const handleCreate = () => {
     if (!name.trim()) return;
@@ -40,231 +72,197 @@ export const NewNodeModal: React.FC = () => {
       name: name.trim(),
       type: selectedType,
       description: description.trim(),
+      tags,
+      owner: owner.trim() || undefined,
       status,
       priority,
       position: {
-        x: Math.round(viewportCenterX - 100),
-        y: Math.round(viewportCenterY - 50),
+        x: Math.round(viewportCenterX - 130),
+        y: Math.round(viewportCenterY - 55),
       },
     });
 
     setName('');
     setDescription('');
+    setTags([]);
+    setOwner('');
     setNewNodeModalOpen(false);
   };
 
   return (
-    <div className="modal-backdrop" onClick={() => setNewNodeModalOpen(false)}>
+    <div className="modal-overlay" onClick={() => setNewNodeModalOpen(false)}>
       <div
-        className="glass-panel animate-slide-down"
+        className="modal-dialog"
         style={{
-          width: '580px',
-          maxHeight: '520px',
-          backgroundColor: '#ffffff',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          width: '460px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            padding: '14px 18px',
+            padding: '12px 16px',
             borderBottom: '1px solid var(--border-subtle)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: 'var(--bg-surface-subtle)',
+            backgroundColor: 'var(--surface-subtle)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Box size={16} color="#09090b" />
-            <span style={{ fontSize: '13px', fontWeight: 600 }}>Create New Node</span>
+            <Box size={15} color="var(--text-primary)" />
+            <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Create Architectural Node</span>
           </div>
-          <button onClick={() => setNewNodeModalOpen(false)} className="btn-icon" style={{ width: '24px', height: '24px' }}>
-            <X size={15} />
+          <button
+            onClick={() => setNewNodeModalOpen(false)}
+            className="hupa-btn ghost icon-only"
+            style={{ width: '22px', height: '22px' }}
+          >
+            <X size={14} />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div style={{ padding: '16px 18px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Node Type Category Filter Tabs */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-              Category
-            </label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-              <button
-                onClick={() => setCategoryFilter('all')}
-                className={`btn ${categoryFilter === 'all' ? 'btn-primary' : ''}`}
-                style={{ padding: '2px 8px', fontSize: '11px' }}
-              >
-                All Types
-              </button>
-              {Object.entries(CATEGORY_LABELS).map(([catKey, catLabel]) => (
-                <button
-                  key={catKey}
-                  onClick={() => setCategoryFilter(catKey)}
-                  className={`btn ${categoryFilter === catKey ? 'btn-primary' : ''}`}
-                  style={{ padding: '2px 8px', fontSize: '11px' }}
-                >
-                  {catLabel}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Type Selection Grid */}
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-              Select Node Type
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', maxHeight: '140px', overflowY: 'auto', padding: '2px' }}>
-              {filteredTypes.map((t) => {
-                const isSelected = selectedType === t.type;
-                return (
-                  <div
-                    key={t.type}
-                    onClick={() => setSelectedType(t.type)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '6px 8px',
-                      borderRadius: '6px',
-                      border: `1.5px solid ${isSelected ? '#09090b' : 'var(--border-subtle)'}`,
-                      backgroundColor: isSelected ? '#09090b' : '#ffffff',
-                      color: isSelected ? '#ffffff' : 'var(--text-primary)',
-                      cursor: 'pointer',
-                      fontSize: '11.5px',
-                      fontWeight: isSelected ? 600 : 500,
-                    }}
-                  >
-                    <DynamicIcon name={t.icon || 'Box'} size={13} color={isSelected ? '#ffffff' : '#09090b'} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {t.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
+        {/* Modal Form Body */}
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Node Name */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
-              Node Name *
+            <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+              Node Identifier / Name *
             </label>
             <input
               type="text"
-              placeholder="e.g. Authentication Service, LLM Router, Payment Gateway..."
+              placeholder="e.g. Auth Service, Postgres Database, API Gateway..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               autoFocus
               style={{
                 width: '100%',
-                padding: '8px 10px',
+                height: '32px',
+                padding: '0 10px',
                 borderRadius: '6px',
-                border: '1px solid var(--border-default)',
-                fontSize: '13px',
-                fontWeight: 500,
+                border: '1px solid var(--border-subtle)',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                outline: 'none',
+                backgroundColor: '#ffffff',
               }}
             />
+          </div>
+
+          {/* Component Type & Status */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Component Type
+              </label>
+              <CustomSelect
+                value={selectedType}
+                options={typeOptions}
+                onChange={setSelectedType}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Status
+              </label>
+              <CustomSelect
+                value={status}
+                options={STATUS_OPTIONS}
+                onChange={(val) => setStatus(val as NodeStatus)}
+              />
+            </div>
+          </div>
+
+          {/* Priority & Owner */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Priority
+              </label>
+              <CustomSelect
+                value={priority}
+                options={PRIORITY_OPTIONS}
+                onChange={(val) => setPriority(val as NodePriority)}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Owner / Lead
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. backend-team, @alex"
+                value={owner}
+                onChange={(e) => setOwner(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '28px',
+                  padding: '0 8px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-subtle)',
+                  fontSize: '11.5px',
+                  outline: 'none',
+                  backgroundColor: '#ffffff',
+                }}
+              />
+            </div>
           </div>
 
           {/* Description */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
               Description
             </label>
             <textarea
-              rows={2}
-              placeholder="Summary of architectural responsibility..."
+              placeholder="Architectural role and functionality..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              rows={2}
               style={{
                 width: '100%',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-default)',
-                fontSize: '12px',
+                padding: '6px 8px',
+                borderRadius: '5px',
+                border: '1px solid var(--border-subtle)',
+                fontSize: '11.5px',
+                outline: 'none',
+                backgroundColor: '#ffffff',
                 resize: 'none',
+                lineHeight: '1.4',
               }}
             />
           </div>
 
-          {/* Status and Priority */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
-                Initial Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as NodeStatus)}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                  backgroundColor: '#ffffff',
-                }}
-              >
-                {['concept', 'planned', 'in-progress', 'active', 'completed', 'blocked'].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
-                Priority
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as NodePriority)}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                  backgroundColor: '#ffffff',
-                }}
-              >
-                {['low', 'medium', 'high', 'critical'].map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Tech Stack / Tags */}
+          <div>
+            <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+              Tech Stack / Tags
+            </label>
+            <CustomTagInput
+              tags={tags}
+              onChange={setTags}
+              placeholder="Type tag (e.g. react, postgres) & press Enter"
+            />
           </div>
-        </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: '12px 18px',
-            borderTop: '1px solid var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface-subtle)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-          }}
-        >
-          <button onClick={() => setNewNodeModalOpen(false)} className="btn">
-            Cancel
-          </button>
-          <button onClick={handleCreate} disabled={!name.trim()} className="btn btn-primary">
-            <Plus size={14} /> Create Node
-          </button>
+          {/* Actions */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '6px',
+              marginTop: '4px',
+              borderTop: '1px solid var(--border-subtle)',
+              paddingTop: '12px',
+            }}
+          >
+            <button onClick={() => setNewNodeModalOpen(false)} className="hupa-btn">
+              Cancel
+            </button>
+            <button onClick={handleCreate} disabled={!name.trim()} className="hupa-btn primary">
+              <Plus size={12} /> Place Node
+            </button>
+          </div>
         </div>
       </div>
     </div>

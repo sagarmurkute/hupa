@@ -68,14 +68,15 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
     edge.targetHandle || 'left'
   );
 
+  const isAnimated = edge.animated || relDef?.animated;
   const strokeDasharray =
-    edge.lineStyle === 'dashed' || relDef?.lineStyle === 'dashed'
+    edge.lineStyle === 'dashed' || relDef?.lineStyle === 'dashed' || isAnimated
       ? '5, 4'
       : edge.lineStyle === 'dotted' || relDef?.lineStyle === 'dotted'
       ? '2, 3'
       : undefined;
 
-  const strokeColor = isSelected ? '#0f172a' : isHovered ? '#1e293b' : '#64748b';
+  const strokeColor = isSelected ? '#0f172a' : isHovered ? '#1e293b' : relDef?.color || '#64748b';
   const strokeWidth = isSelected ? 2.5 : isHovered ? 2.0 : 1.5;
 
   return (
@@ -122,7 +123,7 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
         strokeWidth={strokeWidth}
         strokeDasharray={strokeDasharray}
         markerEnd={`url(#marker-${edge.type})`}
-        className="hupa-edge-path"
+        className={`hupa-edge-path ${isAnimated ? 'edge-animated' : ''}`}
       />
 
       {/* Midpoint Label Badge */}
@@ -131,19 +132,19 @@ export const EdgeRenderer: React.FC<EdgeRendererProps> = ({
         style={{ pointerEvents: 'auto' }}
       >
         <rect
-          x={-(Math.max(40, (edge.label || edge.type).length * 6 + 12) / 2)}
+          x={-(Math.max(42, (edge.label || edge.type).length * 6.5 + 14) / 2)}
           y={-10}
-          width={Math.max(40, (edge.label || edge.type).length * 6 + 12)}
+          width={Math.max(42, (edge.label || edge.type).length * 6.5 + 14)}
           height={20}
-          rx={4}
+          rx={5}
           fill="#ffffff"
           stroke={isSelected ? '#0f172a' : isHovered ? '#94a3b8' : '#e2e8f0'}
           strokeWidth={isSelected ? 1.5 : 1}
-          style={{ filter: 'drop-shadow(0 1px 2px rgba(15, 23, 42, 0.05))' }}
+          style={{ filter: 'drop-shadow(0 1px 3px rgba(15, 23, 42, 0.06))' }}
         />
         <text
           x={0}
-          y={3}
+          y={3.5}
           textAnchor="middle"
           className="edge-label-badge"
           style={{

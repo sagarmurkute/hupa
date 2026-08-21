@@ -27,11 +27,11 @@ export const Minimap: React.FC = () => {
   currentNodes.forEach((n) => {
     minX = Math.min(minX, n.position.x);
     minY = Math.min(minY, n.position.y);
-    maxX = Math.max(maxX, n.position.x + n.size.width);
-    maxY = Math.max(maxY, n.position.y + n.size.height);
+    maxX = Math.max(maxX, n.position.x + (n.size?.width || 240));
+    maxY = Math.max(maxY, n.position.y + (n.size?.height || 76));
   });
 
-  const padding = 200;
+  const padding = 160;
   minX -= padding;
   minY -= padding;
   maxX += padding;
@@ -40,8 +40,8 @@ export const Minimap: React.FC = () => {
   const worldWidth = Math.max(100, maxX - minX);
   const worldHeight = Math.max(100, maxY - minY);
 
-  const mapWidth = 180;
-  const mapHeight = 120;
+  const mapWidth = 160;
+  const mapHeight = 100;
 
   const scaleX = mapWidth / worldWidth;
   const scaleY = mapHeight / worldHeight;
@@ -81,22 +81,23 @@ export const Minimap: React.FC = () => {
     <div
       ref={containerRef}
       onClick={handleMinimapClick}
-      className="glass-panel"
       style={{
         position: 'absolute',
-        bottom: '44px',
-        right: '16px',
+        bottom: '18px',
+        right: '18px',
         width: `${mapWidth}px`,
         height: `${mapHeight}px`,
         overflow: 'hidden',
         cursor: 'pointer',
-        zIndex: 35,
+        zIndex: 25,
         backgroundColor: '#ffffff',
         border: '1px solid var(--border-subtle)',
-        boxShadow: 'var(--shadow-md)',
+        borderRadius: '8px',
+        boxShadow: 'var(--shadow-drawer)',
       }}
+      title="Minimap (Click to pan)"
     >
-      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: 'var(--surface-subtle)' }}>
         {/* Draw Groups */}
         {currentGroups.map((g) => {
           const gx = (g.position.x - minX) * scale;
@@ -112,8 +113,8 @@ export const Minimap: React.FC = () => {
                 top: `${gy}px`,
                 width: `${gw}px`,
                 height: `${gh}px`,
-                backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                border: '1px dashed #71717a',
+                backgroundColor: 'rgba(15, 23, 42, 0.04)',
+                border: '1px dashed #94a3b8',
                 borderRadius: '3px',
               }}
             />
@@ -124,8 +125,8 @@ export const Minimap: React.FC = () => {
         {currentNodes.map((n) => {
           const nx = (n.position.x - minX) * scale;
           const ny = (n.position.y - minY) * scale;
-          const nw = Math.max(3, n.size.width * scale);
-          const nh = Math.max(2, n.size.height * scale);
+          const nw = Math.max(4, (n.size?.width || 240) * scale);
+          const nh = Math.max(3, (n.size?.height || 76) * scale);
           const isSelected = selectedNodeIds.includes(n.id);
 
           return (
@@ -137,26 +138,25 @@ export const Minimap: React.FC = () => {
                 top: `${ny}px`,
                 width: `${nw}px`,
                 height: `${nh}px`,
-                backgroundColor: isSelected ? '#09090b' : '#71717a',
+                backgroundColor: isSelected ? '#0f172a' : '#64748b',
                 borderRadius: '2px',
-                opacity: isSelected ? 1 : 0.6,
               }}
             />
           );
         })}
 
-        {/* Viewport Box */}
+        {/* Viewport Bounds Rectangle */}
         <div
           style={{
             position: 'absolute',
-            left: `${vpMapX}px`,
-            top: `${vpMapY}px`,
-            width: `${vpMapW}px`,
-            height: `${vpMapH}px`,
-            border: '1.5px solid #09090b',
-            backgroundColor: 'rgba(0, 0, 0, 0.08)',
-            borderRadius: '2px',
+            left: `${Math.max(0, vpMapX)}px`,
+            top: `${Math.max(0, vpMapY)}px`,
+            width: `${Math.min(mapWidth, vpMapW)}px`,
+            height: `${Math.min(mapHeight, vpMapH)}px`,
+            border: '1.5px solid #0f172a',
+            backgroundColor: 'rgba(15, 23, 42, 0.08)',
             pointerEvents: 'none',
+            borderRadius: '3px',
           }}
         />
       </div>

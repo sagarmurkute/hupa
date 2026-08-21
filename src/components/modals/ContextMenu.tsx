@@ -76,17 +76,18 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       style={{
         position: 'fixed',
         left: `${Math.min(menuState.x, window.innerWidth - 220)}px`,
-        top: `${Math.min(menuState.y, window.innerHeight - 320)}px`,
-        width: '200px',
-        backgroundColor: '#ffffff',
-        padding: '4px',
+        top: `${Math.min(menuState.y, window.innerHeight - 340)}px`,
+        width: '210px',
+        backgroundColor: 'rgba(255, 255, 255, 0.96)',
+        backdropFilter: 'blur(16px)',
+        padding: '5px',
         zIndex: 100,
         boxShadow: 'var(--shadow-xl)',
         display: 'flex',
         flexDirection: 'column',
         gap: '2px',
         borderRadius: '8px',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--border-subtle)',
       }}
     >
       {/* Node Context Menu */}
@@ -97,8 +98,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               padding: '6px 8px',
               fontSize: '11px',
               fontWeight: 600,
-              color: 'var(--text3)',
-              borderBottom: '1px solid var(--border)',
+              color: 'var(--text-muted)',
+              borderBottom: '1px solid var(--border-subtle)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
           >
             {targetNode.name}
@@ -109,10 +113,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               drillIntoNode(targetNode.id);
               onClose();
             }}
-            className="btn ghost small"
+            className="hupa-btn ghost small"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <GitFork size={12} color="var(--indigo)" /> Drill into Subsystem ↗
+            <GitFork size={12} color="var(--accent-indigo)" /> Drill into Subsystem ↗
           </button>
 
           <button
@@ -125,7 +129,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               addEdge(targetNode.id, newChildId, 'contains', 'contains');
               onClose();
             }}
-            className="btn ghost small"
+            className="hupa-btn ghost small"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
             <Plus size={12} /> Create Child Node
@@ -137,7 +141,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               setInspectorTab('overview');
               onClose();
             }}
-            className="btn ghost small"
+            className="hupa-btn ghost small"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
             <Edit size={12} /> Inspect Properties
@@ -148,7 +152,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               duplicateSelectedNodes();
               onClose();
             }}
-            className="btn ghost small"
+            className="hupa-btn ghost small"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
             <Copy size={12} /> Duplicate Node
@@ -160,22 +164,22 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 groupSelectedNodes('New Component Group');
                 onClose();
               }}
-              className="btn ghost small"
+              className="hupa-btn ghost small"
               style={{ width: '100%', justifyContent: 'flex-start' }}
             >
               <FolderPlus size={12} /> Group Selected ({selectedNodeIds.length})
             </button>
           )}
 
-          <div style={{ height: '1px', backgroundColor: 'var(--border)', margin: '2px 0' }} />
+          <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
 
           <button
             onClick={() => {
               deleteNode(targetNode.id);
               onClose();
             }}
-            className="btn ghost small"
-            style={{ width: '100%', justifyContent: 'flex-start', color: '#ef4444' }}
+            className="hupa-btn ghost small danger"
+            style={{ width: '100%', justifyContent: 'flex-start', color: '#e11d48' }}
           >
             <Trash2 size={12} /> Delete Node
           </button>
@@ -190,8 +194,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               padding: '6px 8px',
               fontSize: '11px',
               fontWeight: 600,
-              color: 'var(--text3)',
-              borderBottom: '1px solid var(--border)',
+              color: 'var(--text-muted)',
+              borderBottom: '1px solid var(--border-subtle)',
             }}
           >
             Relationship: {targetEdge.label || targetEdge.type}
@@ -205,13 +209,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               });
               onClose();
             }}
-            className="btn ghost small"
+            className="hupa-btn ghost small"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
             <ArrowLeftRight size={12} /> Swap Direction
           </button>
 
-          <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase' }}>
+          <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
             Set Relation Type
           </div>
 
@@ -227,7 +231,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                   });
                   onClose();
                 }}
-                className="btn ghost small"
+                className="hupa-btn ghost small"
                 style={{
                   width: '100%',
                   justifyContent: 'space-between',
@@ -242,15 +246,15 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             ))}
           </div>
 
-          <div style={{ height: '1px', backgroundColor: 'var(--border)', margin: '2px 0' }} />
+          <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
 
           <button
             onClick={() => {
               deleteEdge(targetEdge.id);
               onClose();
             }}
-            className="btn ghost small"
-            style={{ width: '100%', justifyContent: 'flex-start', color: '#ef4444' }}
+            className="hupa-btn ghost small danger"
+            style={{ width: '100%', justifyContent: 'flex-start', color: '#e11d48' }}
           >
             <Trash2 size={12} /> Delete Relationship
           </button>
@@ -265,7 +269,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               setNewNodeModalOpen(true);
               onClose();
             }}
-            className="btn ghost small"
+            className="hupa-btn ghost small"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
             <Plus size={12} /> Create Node Here
@@ -277,7 +281,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 groupSelectedNodes('New Component Group');
                 onClose();
               }}
-              className="btn ghost small"
+              className="hupa-btn ghost small"
               style={{ width: '100%', justifyContent: 'flex-start' }}
             >
               <FolderPlus size={12} /> Group Selected ({selectedNodeIds.length})
@@ -289,10 +293,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               onAutoLayout();
               onClose();
             }}
-            className="btn ghost small"
+            className="hupa-btn ghost small"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
-            <Sparkles size={12} color="var(--indigo)" /> Auto-Layout Graph
+            <Sparkles size={12} color="var(--accent-indigo)" /> Auto-Layout Graph
           </button>
 
           <button
@@ -300,7 +304,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               zoomToFit();
               onClose();
             }}
-            className="btn ghost small"
+            className="hupa-btn ghost small"
             style={{ width: '100%', justifyContent: 'flex-start' }}
           >
             <Maximize2 size={12} /> Fit to Screen

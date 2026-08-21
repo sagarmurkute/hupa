@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { UPGNode, NodeTypeDefinition } from '../../types/graph';
+import type { UPGNode, NodeTypeDefinition, NodePosition } from '../../types/graph';
 import { BUILTIN_NODE_TYPES } from '../../constants/nodeTypes';
 import { useGraphStore } from '../../store/useGraphStore';
 import { DynamicIcon } from '../common/DynamicIcon';
-import { snapToGrid } from '../../utils/geometry';
-import { GitFork, ArrowDownRight } from 'lucide-react';
+import { snapToGrid, getHandleCoordinates } from '../../utils/geometry';
+import type { HandlePosition } from '../../utils/geometry';
+import { GitFork, ArrowDownRight, User } from 'lucide-react';
 
 interface NodeCardProps {
   node: UPGNode;
@@ -23,6 +24,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   const {
     selectNode,
     updateNodePosition,
+    updateMultipleNodePositions,
     updateNodeSize,
     startConnection,
     openRelationshipPicker,
@@ -37,18 +39,14 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   const [isResizing, setIsResizing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  const dragStartRef = useRef<{ startX: number; startY: number; initialNodeX: number; initialNodeY: number }>({
+  const dragStartRef = useRef<{
+    startX: number;
+    startY: number;
+    initialPositions: Record<string, NodePosition>;
+  }>({
     startX: 0,
     startY: 0,
-    initialNodeX: 0,
-    initialNodeY: 0,
-  });
-
-  const resizeStartRef = useRef<{ startX: number; startY: number; initialW: number; initialH: number }>({
-    startX: 0,
-    startY: 0,
-    initialW: 240,
-    initialH: 76,
+    initialPositions: {},
   });
 
   const isConnecting = pendingConnection !== null;
@@ -57,11 +55,12 @@ export const NodeCard: React.FC<NodeCardProps> = ({
 
   // Zoom Level of Detail (LOD)
   const currentZoom = transform.zoom;
-  const isMacroView = currentZoom < 0.55;
-  const isDetailView = currentZoom > 1.25;
+  const isMacroView = currentZoom < 0.5;
+  const isDetailView = currentZoom > 1.15;
 
-  const nodeWidth = node.size?.width || 240;
-  const nodeHeight = node.size?.height || (isMacroView ? 44 : 76);
+  const nodeWidth = node.size?.width || 260;
+  const nodeHeight = node.size?.height || (isMacroView ? 44 : 110);
+  const nodeSize = { width: nodeWidth, height: nodeHeight };
 
   // Live dependency count
   const depCount = Object.values(edges).filter((e) => e.sourceNodeId === node.id || e.targetNodeId === node.id).length;
@@ -78,14 +77,36 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     if (e.button === 0) {
       e.stopPropagation();
       const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
-      selectNode(node.id, isMulti);
+      
+      const currentSelected = useGraphStore.getState().selectedNodeIds;
+      let activeSelected = currentSelected;
+      if (!isMulti && !currentSelected.includes(node.id)) {
+        selectNode(node.id, false);
+        activeSelected = [node.id];
+      } else if (isMulti) {
+        selectNode(node.id, true);
+        activeSelected = currentSelected.includes(node.id)
+          ? currentSelected.filter((id) => id !== node.id)
+          : [...currentSelected, node.id];
+      }
+
+      // Collect initial positions for all nodes being dragged
+      const initPositions: Record<string, NodePosition> = {};
+      const allNodes = useGraphStore.getState().nodes;
+      activeSelected.forEach((id) => {
+        if (allNodes[id]) {
+          initPositions[id] = { ...allNodes[id].position };
+        }
+      });
+      if (!initPositions[node.id]) {
+        initPositions[node.id] = { ...node.position };
+      }
 
       setIsDragging(true);
       dragStartRef.current = {
         startX: e.clientX,
         startY: e.clientY,
-        initialNodeX: node.position.x,
-        initialNodeY: node.position.y,
+        initialPositions: initPositions,
       };
     }
   };
@@ -97,19 +118,38 @@ export const NodeCard: React.FC<NodeCardProps> = ({
       const dx = (e.clientX - dragStartRef.current.startX) / transform.zoom;
       const dy = (e.clientY - dragStartRef.current.startY) / transform.zoom;
 
-      let newX = dragStartRef.current.initialNodeX + dx;
-      let newY = dragStartRef.current.initialNodeY + dy;
+      const targetIds = Object.keys(dragStartRef.current.initialPositions);
+      if (targetIds.length <= 1) {
+        let newX = (dragStartRef.current.initialPositions[node.id]?.x ?? node.position.x) + dx;
+        let newY = (dragStartRef.current.initialPositions[node.id]?.y ?? node.position.y) + dy;
 
-      if (isSnapToGrid) {
-        newX = snapToGrid(newX);
-        newY = snapToGrid(newY);
+        if (isSnapToGrid) {
+          newX = snapToGrid(newX);
+          newY = snapToGrid(newY);
+        }
+
+        updateNodePosition(node.id, { x: newX, y: newY });
+      } else {
+        const nextPositions: Record<string, NodePosition> = {};
+        targetIds.forEach((id) => {
+          const initPos = dragStartRef.current.initialPositions[id];
+          if (initPos) {
+            let nx = initPos.x + dx;
+            let ny = initPos.y + dy;
+            if (isSnapToGrid) {
+              nx = snapToGrid(nx);
+              ny = snapToGrid(ny);
+            }
+            nextPositions[id] = { x: nx, y: ny };
+          }
+        });
+        updateMultipleNodePositions(nextPositions);
       }
-
-      updateNodePosition(node.id, { x: newX, y: newY });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      useGraphStore.getState().saveToStorage();
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -118,9 +158,16 @@ export const NodeCard: React.FC<NodeCardProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, transform.zoom, isSnapToGrid, node.id, updateNodePosition]);
+  }, [isDragging, transform.zoom, isSnapToGrid, node.id, node.position, updateNodePosition, updateMultipleNodePositions]);
 
   // Handle resizing
+  const resizeStartRef = useRef<{ startX: number; startY: number; initialW: number; initialH: number }>({
+    startX: 0,
+    startY: 0,
+    initialW: 260,
+    initialH: 110,
+  });
+
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsResizing(true);
@@ -139,8 +186,8 @@ export const NodeCard: React.FC<NodeCardProps> = ({
       const dx = (e.clientX - resizeStartRef.current.startX) / transform.zoom;
       const dy = (e.clientY - resizeStartRef.current.startY) / transform.zoom;
 
-      let newW = Math.max(180, resizeStartRef.current.initialW + dx);
-      let newH = Math.max(50, resizeStartRef.current.initialH + dy);
+      let newW = Math.max(200, resizeStartRef.current.initialW + dx);
+      let newH = Math.max(70, resizeStartRef.current.initialH + dy);
 
       if (isSnapToGrid) {
         newW = snapToGrid(newW);
@@ -152,6 +199,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      useGraphStore.getState().saveToStorage();
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -163,33 +211,15 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   }, [isResizing, transform.zoom, isSnapToGrid, node.id, updateNodeSize]);
 
   // Handle connection start from any handle
-  const handleStartConnection = (
-    e: React.MouseEvent,
-    handlePos: 'top' | 'right' | 'bottom' | 'left'
-  ) => {
+  const handleStartConnection = (e: React.MouseEvent, handlePos: HandlePosition) => {
     e.stopPropagation();
     e.preventDefault();
-    const handleCoordX =
-      handlePos === 'right'
-        ? node.position.x + nodeWidth
-        : handlePos === 'left'
-        ? node.position.x
-        : node.position.x + nodeWidth / 2;
-    const handleCoordY =
-      handlePos === 'bottom'
-        ? node.position.y + nodeHeight
-        : handlePos === 'top'
-        ? node.position.y
-        : node.position.y + nodeHeight / 2;
-
-    startConnection(node.id, handlePos, handleCoordX, handleCoordY);
+    const pt = getHandleCoordinates(node.position, nodeSize, handlePos);
+    startConnection(node.id, handlePos, pt.x, pt.y);
   };
 
   // Handle connection drop onto this node or its handles
-  const handleCompleteDrop = (
-    e: React.MouseEvent,
-    targetHandle: 'top' | 'right' | 'bottom' | 'left' = 'left'
-  ) => {
+  const handleCompleteDrop = (e: React.MouseEvent, targetHandle: HandlePosition = 'left') => {
     const currentPending = useGraphStore.getState().pendingConnection;
     if (currentPending && currentPending.sourceNodeId !== node.id) {
       e.stopPropagation();
@@ -203,20 +233,30 @@ export const NodeCard: React.FC<NodeCardProps> = ({
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'completed':
+      case 'active':
+        return { color: '#059669', bg: '#ecfdf5', label: 'Active' };
       case 'review':
-        return '#059669';
+        return { color: '#2563eb', bg: '#eff6ff', label: 'Review' };
       case 'in-progress':
-        return '#d97706';
+        return { color: '#d97706', bg: '#fffbeb', label: 'In Progress' };
       case 'blocked':
+        return { color: '#e11d48', bg: '#fff1f2', label: 'Blocked' };
       case 'deprecated':
-        return '#e11d48';
+        return { color: '#94a3b8', bg: '#f8fafc', label: 'Deprecated' };
       default:
-        return '#94a3b8';
+        return { color: '#64748b', bg: '#f1f5f9', label: 'Planned' };
     }
   };
+
+  const statusConfig = getStatusConfig(node.status);
+
+  // Extract key property pairs to showcase on the card (up to 2)
+  const keyProperties = Object.entries(node.properties || {})
+    .filter(([k]) => !['description', 'title', 'id'].includes(k))
+    .slice(0, 2);
 
   return (
     <div
@@ -230,9 +270,18 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         width: `${nodeWidth}px`,
         minHeight: `${nodeHeight}px`,
         position: 'absolute',
-        padding: isMacroView ? '6px 10px' : '10px 12px',
+        pointerEvents: 'auto',
+        padding: isMacroView ? '8px 12px' : '10px 12px',
         justifyContent: isMacroView ? 'center' : 'space-between',
-        zIndex: isSelected ? 30 : isDragging ? 35 : isConnecting ? 25 : 15,
+        zIndex: isSelected ? 40 : isDragging ? 45 : isConnecting ? 30 : 20,
+        borderTop: `3px solid ${typeDef.color || '#0f172a'}`,
+        backgroundColor: '#ffffff',
+        borderRadius: '8px',
+        boxShadow: isSelected
+          ? '0 0 0 1.5px #0f172a, 0 10px 24px -2px rgba(15, 23, 42, 0.12)'
+          : isHovered
+          ? '0 6px 18px rgba(15, 23, 42, 0.08)'
+          : '0 1px 3px rgba(15, 23, 42, 0.05)',
       }}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
@@ -250,15 +299,15 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         onContextMenu(e, node.id);
       }}
     >
-      {/* 1. MACRO VIEW (When Zoom < 0.55) */}
+      {/* 1. MACRO VIEW (When Zoomed Out) */}
       {isMacroView ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
-              width: '6px',
-              height: '6px',
+              width: '8px',
+              height: '8px',
               borderRadius: '50%',
-              backgroundColor: getStatusColor(node.status),
+              backgroundColor: statusConfig.color,
               flexShrink: 0,
             }}
           />
@@ -277,7 +326,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
           </div>
           <span
             style={{
-              fontSize: '10px',
+              fontSize: '9.5px',
               fontFamily: 'var(--font-mono)',
               color: 'var(--text-muted)',
               textTransform: 'uppercase',
@@ -287,12 +336,13 @@ export const NodeCard: React.FC<NodeCardProps> = ({
           </span>
         </div>
       ) : (
-        /* 2. STANDARD & DETAIL VIEW */
+        /* 2. STANDARD & RICH DETAIL VIEW */
         <>
           <div>
-            {/* Top Identity Row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+            {/* Top Identity & Status Row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              {/* Type Chip */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
                 <span
                   style={{
                     display: 'inline-flex',
@@ -302,70 +352,114 @@ export const NodeCard: React.FC<NodeCardProps> = ({
                     fontFamily: 'var(--font-mono)',
                     fontWeight: 600,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
+                    letterSpacing: '0.03em',
                     color: 'var(--text-secondary)',
                     backgroundColor: 'var(--surface-subtle)',
-                    padding: '1px 5px',
-                    borderRadius: '3px',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--border-subtle)',
                   }}
                 >
-                  <DynamicIcon name={typeDef.icon || 'Box'} size={10} color="var(--text-secondary)" />
+                  <DynamicIcon name={typeDef.icon || 'Box'} size={11} color="var(--text-secondary)" />
                   {typeDef.label}
                 </span>
 
+                {/* Priority Badge if High/Critical */}
+                {node.priority && (node.priority === 'critical' || node.priority === 'high') && (
+                  <span
+                    style={{
+                      fontSize: '8.5px',
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      backgroundColor: node.priority === 'critical' ? '#ffe4e6' : '#fef3c7',
+                      color: node.priority === 'critical' ? '#e11d48' : '#b45309',
+                    }}
+                  >
+                    {node.priority}
+                  </span>
+                )}
+              </div>
+
+              {/* Status Pill */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: statusConfig.bg,
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  fontSize: '9.5px',
+                  fontWeight: 600,
+                  color: statusConfig.color,
+                }}
+              >
                 <div
-                  title={`Status: ${node.status}`}
                   style={{
                     width: '5px',
                     height: '5px',
                     borderRadius: '50%',
-                    backgroundColor: getStatusColor(node.status),
-                    flexShrink: 0,
+                    backgroundColor: statusConfig.color,
                   }}
                 />
+                <span>{statusConfig.label}</span>
+              </div>
+            </div>
+
+            {/* Title & Subsystem drill-down */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '6px' }}>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  color: 'var(--text-primary)',
+                  letterSpacing: '-0.01em',
+                  lineHeight: '1.3',
+                  wordBreak: 'break-word',
+                  flex: 1,
+                }}
+                title={node.name}
+              >
+                {node.name}
               </div>
 
-              {/* SubGraph Subsystem Drill-down Indicator */}
               {node.subGraphId && (
-                <span
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    drillIntoNode(node.id);
+                  }}
                   style={{
                     fontSize: '10px',
                     color: 'var(--accent-indigo)',
-                    fontFamily: 'var(--font-mono)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+                    padding: '2px 5px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '2px',
+                    gap: '3px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
                   }}
-                  title="Nested Subsystem Graph (Double click to enter)"
+                  title="Drill into nested subsystem graph"
                 >
                   <GitFork size={10} /> Subsystem ↗
-                </span>
+                </button>
               )}
             </div>
 
-            {/* Title */}
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: '12.5px',
-                color: 'var(--text-primary)',
-                letterSpacing: '-0.01em',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-              title={node.name}
-            >
-              {node.name}
-            </div>
-
-            {/* Description (2-line clamp) */}
+            {/* Description */}
             <div
               style={{
                 fontSize: '11px',
                 color: 'var(--text-secondary)',
                 lineHeight: '1.35',
-                marginTop: '3px',
+                marginTop: '4px',
                 display: '-webkit-box',
                 WebkitLineClamp: isDetailView ? 3 : 2,
                 WebkitBoxOrient: 'vertical',
@@ -375,29 +469,77 @@ export const NodeCard: React.FC<NodeCardProps> = ({
             >
               {node.description || 'No architectural description.'}
             </div>
+
+            {/* Tech Stack & Key Properties (Richer Info!) */}
+            {((node.tags && node.tags.length > 0) || keyProperties.length > 0) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '6px' }}>
+                {/* Tags */}
+                {(node.tags || []).slice(0, 3).map((tag) => (
+                  <span
+                    key={tag}
+                    style={{
+                      fontSize: '9.5px',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                      backgroundColor: 'var(--surface-subtle)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-subtle)',
+                    }}
+                  >
+                    #{tag}
+                  </span>
+                ))}
+
+                {/* Key Properties */}
+                {keyProperties.map(([key, val]) => (
+                  <span
+                    key={key}
+                    style={{
+                      fontSize: '9.5px',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                      backgroundColor: '#f8fafc',
+                      color: '#475569',
+                      border: '1px solid #e2e8f0',
+                      maxWidth: '120px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={`${key}: ${val}`}
+                  >
+                    <strong>{key}:</strong> {String(val)}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Bottom Metadata / Deep Detail Tier */}
+          {/* Bottom Metadata Bar */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginTop: '6px',
-              paddingTop: '5px',
+              marginTop: '8px',
+              paddingTop: '6px',
               borderTop: '1px solid var(--surface-subtle)',
               fontSize: '10px',
               fontFamily: 'var(--font-mono)',
               color: 'var(--text-muted)',
             }}
           >
-            <span>v{node.version || '0.1.0'}</span>
+            <span>v{node.version || '1.0.0'}</span>
 
-            {isDetailView && node.owner && (
-              <span style={{ color: 'var(--text-secondary)' }}>@{node.owner}</span>
+            {node.owner && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: 'var(--text-secondary)' }}>
+                <User size={10} /> {node.owner}
+              </span>
             )}
 
-            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               <ArrowDownRight size={10} /> {depCount} rels
             </span>
           </div>
@@ -454,7 +596,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
             width: '8px',
             height: '8px',
             cursor: 'nwse-resize',
-            opacity: 0.4,
+            opacity: 0.45,
           }}
           title="Resize node"
         >

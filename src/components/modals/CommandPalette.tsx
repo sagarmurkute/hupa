@@ -12,6 +12,7 @@ import {
   Download,
   Zap,
   HelpCircle,
+  CornerDownLeft,
 } from 'lucide-react';
 
 export const CommandPalette: React.FC = () => {
@@ -40,9 +41,7 @@ export const CommandPalette: React.FC = () => {
 
   useEffect(() => {
     if (isCommandPaletteOpen) {
-      setQuery('');
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      inputRef.current?.focus();
     }
   }, [isCommandPaletteOpen]);
 
@@ -58,14 +57,11 @@ export const CommandPalette: React.FC = () => {
     action: () => void;
   }
 
-  const items: PaletteItem[] = [];
-
-  // Actions
-  items.push(
+  const items: PaletteItem[] = [
     {
       id: 'act-add-node',
-      title: 'Create New Node',
-      subtitle: 'Add a new architecture or code primitive',
+      title: 'Create Architectural Node',
+      subtitle: 'Add a new component primitive to the graph',
       category: 'actions',
       iconComponent: Plus,
       action: () => setNewNodeModalOpen(true),
@@ -81,7 +77,7 @@ export const CommandPalette: React.FC = () => {
     {
       id: 'act-toggle-grid',
       title: 'Toggle Background Grid',
-      subtitle: 'Switch between dot grid and plain canvas',
+      subtitle: 'Switch between matrix grid and plain workspace',
       category: 'actions',
       iconComponent: Layers,
       action: () => toggleGrid(),
@@ -97,7 +93,7 @@ export const CommandPalette: React.FC = () => {
     {
       id: 'act-custom-type',
       title: 'Custom Types Builder',
-      subtitle: 'Define custom node and edge specifications',
+      subtitle: 'Define custom node and relationship specifications',
       category: 'actions',
       iconComponent: Zap,
       action: () => setCustomTypeModalOpen(true),
@@ -125,17 +121,17 @@ export const CommandPalette: React.FC = () => {
       category: 'actions',
       iconComponent: Sparkles,
       action: () => setStatsModalOpen(true),
-    }
-  );
+    },
+  ];
 
-  // Views
+  // Perspectives
   views.forEach((v) => {
     items.push({
       id: `view-${v.id}`,
-      title: `Switch to ${v.name}`,
+      title: `Switch to Perspective: ${v.name}`,
       subtitle: v.description,
       category: 'views',
-      iconName: v.icon,
+      iconName: v.icon || 'Layers',
       action: () => setActiveView(v.id),
     });
   });
@@ -148,21 +144,20 @@ export const CommandPalette: React.FC = () => {
       items.push({
         id: `node-${n.id}`,
         title: n.name,
-        subtitle: `${typeDef.label} • ${n.description?.slice(0, 60) || ''}`,
+        subtitle: `${typeDef.label} • ${n.description || 'No description'}`,
         category: 'nodes',
-        iconName: typeDef.icon,
+        iconName: typeDef.icon || 'Box',
         action: () => {
           selectNode(n.id);
           setTransform((prev) => ({
-            x: window.innerWidth / 2 - (n.position.x + (n.size?.width || 210) / 2) * prev.zoom,
-            y: window.innerHeight / 2 - (n.position.y + (n.size?.height || 110) / 2) * prev.zoom,
-            zoom: Math.max(0.8, prev.zoom),
+            x: window.innerWidth / 2 - (n.position.x + (n.size?.width || 240) / 2) * prev.zoom,
+            y: window.innerHeight / 2 - (n.position.y + (n.size?.height || 76) / 2) * prev.zoom,
+            zoom: Math.max(0.85, prev.zoom),
           }));
         },
       });
     });
 
-  // Filter items
   const filteredItems = items.filter((item) => {
     if (!query.trim()) return true;
     const q = query.toLowerCase();
@@ -172,10 +167,10 @@ export const CommandPalette: React.FC = () => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredItems.length));
+      setSelectedIndex((prev) => (prev + 1) % (filteredItems.length || 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filteredItems.length) % Math.max(1, filteredItems.length));
+      setSelectedIndex((prev) => (prev - 1 + filteredItems.length) % (filteredItems.length || 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (filteredItems[selectedIndex]) {
@@ -188,25 +183,16 @@ export const CommandPalette: React.FC = () => {
   };
 
   return (
-    <div
-      className="modal-backdrop"
-      onClick={() => setCommandPaletteOpen(false)}
-      onKeyDown={handleKeyDown}
-    >
+    <div className="modal-overlay" onClick={() => setCommandPaletteOpen(false)}>
       <div
-        className="glass-panel animate-slide-down"
+        className="modal-dialog"
         style={{
           width: '560px',
           maxHeight: '440px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          backgroundColor: '#ffffff',
-          boxShadow: 'var(--shadow-xl)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Search Header */}
+        {/* Search Input */}
         <div
           style={{
             display: 'flex',
@@ -214,36 +200,39 @@ export const CommandPalette: React.FC = () => {
             gap: '10px',
             padding: '12px 16px',
             borderBottom: '1px solid var(--border-subtle)',
+            backgroundColor: '#ffffff',
           }}
         >
-          <Search size={16} color="var(--text-muted)" />
+          <Search size={15} color="var(--text-muted)" />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a command, view, or node name..."
+            placeholder="Type a command, search nodes, or switch perspectives..."
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
+            onKeyDown={handleKeyDown}
             style={{
               flex: 1,
               border: 'none',
               outline: 'none',
-              fontSize: '13.5px',
+              fontSize: '13px',
               fontWeight: 500,
+              backgroundColor: 'transparent',
               color: 'var(--text-primary)',
             }}
           />
           <kbd
             style={{
-              fontSize: '10px',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              backgroundColor: 'var(--bg-surface-subtle)',
+              padding: '1px 5px',
+              borderRadius: '3px',
+              backgroundColor: 'var(--surface-subtle)',
               border: '1px solid var(--border-subtle)',
-              color: 'var(--text-muted)',
               fontFamily: 'var(--font-mono)',
+              fontSize: '10px',
+              color: 'var(--text-muted)',
             }}
           >
             ESC
@@ -251,96 +240,89 @@ export const CommandPalette: React.FC = () => {
         </div>
 
         {/* Results List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px' }}>
-          {filteredItems.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-              No commands or nodes found matching "{query}"
-            </div>
-          ) : (
-            filteredItems.map((item, idx) => {
-              const isSelected = idx === selectedIndex;
-              const IconComp = item.iconComponent;
-              return (
+        <div style={{ padding: '6px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {filteredItems.map((item, idx) => {
+            const isSelected = idx === selectedIndex;
+            const IconComponent = item.iconComponent;
+            return (
+              <div
+                key={item.id}
+                onClick={() => {
+                  item.action();
+                  setCommandPaletteOpen(false);
+                }}
+                onMouseEnter={() => setSelectedIndex(idx)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '8px 10px',
+                  borderRadius: '5px',
+                  backgroundColor: isSelected ? 'var(--surface-subtle)' : 'transparent',
+                  border: isSelected ? '1px solid var(--border-subtle)' : '1px solid transparent',
+                  cursor: 'pointer',
+                }}
+              >
                 <div
-                  key={item.id}
-                  onClick={() => {
-                    item.action();
-                    setCommandPaletteOpen(false);
-                  }}
-                  onMouseEnter={() => setSelectedIndex(idx)}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '7px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: isSelected ? '#0f172a' : 'transparent',
-                    color: isSelected ? '#ffffff' : 'var(--text-primary)',
-                    cursor: 'pointer',
-                    transition: 'background var(--transition-fast)',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '4px',
+                    backgroundColor: isSelected ? '#0f172a' : 'var(--surface-subtle)',
+                    color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '5px',
-                        backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#f1f5f9',
-                        color: isSelected ? '#ffffff' : '#0f172a',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {IconComp ? (
-                        <IconComp size={13} color={isSelected ? '#ffffff' : '#0f172a'} />
-                      ) : (
-                        <DynamicIcon name={item.iconName || 'Box'} size={13} color={isSelected ? '#ffffff' : '#0f172a'} />
-                      )}
-                    </div>
-                    <div style={{ overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          fontSize: '12.5px',
-                          fontWeight: isSelected ? 600 : 500,
-                          color: isSelected ? '#ffffff' : 'var(--text-primary)',
-                        }}
-                      >
-                        {item.title}
-                      </div>
-                      {item.subtitle && (
-                        <div
-                          style={{
-                            fontSize: '11px',
-                            color: isSelected ? '#cbd5e1' : 'var(--text-muted)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {item.subtitle}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <span
-                    style={{
-                      fontSize: '9.5px',
-                      textTransform: 'uppercase',
-                      fontWeight: 600,
-                      color: isSelected ? '#94a3b8' : 'var(--text-subtle)',
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    {item.category}
-                  </span>
+                  {IconComponent ? (
+                    <IconComponent size={13} />
+                  ) : item.iconName ? (
+                    <DynamicIcon name={item.iconName} size={13} color={isSelected ? '#ffffff' : 'var(--text-secondary)'} />
+                  ) : (
+                    <Layers size={13} />
+                  )}
                 </div>
-              );
-            })
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {item.title}
+                  </div>
+                  {item.subtitle && (
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.subtitle}
+                    </div>
+                  )}
+                </div>
+
+                {isSelected && <CornerDownLeft size={12} color="var(--text-muted)" />}
+              </div>
+            );
+          })}
+
+          {filteredItems.length === 0 && (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+              No commands or nodes matching "{query}"
+            </div>
           )}
+        </div>
+
+        {/* Footer info */}
+        <div
+          style={{
+            padding: '6px 14px',
+            borderTop: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--surface-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '10.5px',
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono)',
+          }}
+        >
+          <span>↑↓ to navigate • ↵ to execute</span>
+          <span>{filteredItems.length} results</span>
         </div>
       </div>
     </div>

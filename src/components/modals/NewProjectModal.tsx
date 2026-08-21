@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { UNIVERSAL_TEMPLATES } from '../../constants/templates';
 import { FolderPlus, X, Box, Globe, Server, Bot, FileCode } from 'lucide-react';
@@ -10,6 +10,18 @@ export const NewProjectModal: React.FC = () => {
   const [description, setDescription] = useState('');
   const [domain, setDomain] = useState('Systems & Web');
   const [selectedTemplateId, setSelectedTemplateId] = useState('fullstack-web');
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setNewProjectModalOpen(false);
+      }
+    };
+    if (isNewProjectModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isNewProjectModalOpen, setNewProjectModalOpen]);
 
   if (!isNewProjectModalOpen) return null;
 
@@ -42,147 +54,139 @@ export const NewProjectModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-backdrop" onClick={() => setNewProjectModalOpen(false)}>
+    <div className="modal-overlay" onClick={() => setNewProjectModalOpen(false)}>
       <div
-        className="glass-panel animate-slide-down"
+        className="modal-dialog"
         style={{
-          width: '560px',
-          backgroundColor: '#ffffff',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          width: '540px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            padding: '14px 18px',
+            padding: '12px 16px',
             borderBottom: '1px solid var(--border-subtle)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: 'var(--bg-surface-subtle)',
+            backgroundColor: 'var(--surface-subtle)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FolderPlus size={16} color="#09090b" />
-            <span style={{ fontSize: '13px', fontWeight: 600 }}>Create New Project Graph</span>
+            <FolderPlus size={15} color="var(--text-primary)" />
+            <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Create New Project Graph</span>
           </div>
-          <button onClick={() => setNewProjectModalOpen(false)} className="btn-icon" style={{ width: '24px', height: '24px' }}>
-            <X size={15} />
+          <button
+            onClick={() => setNewProjectModalOpen(false)}
+            className="hupa-btn ghost icon-only"
+            style={{ width: '22px', height: '22px' }}
+          >
+            <X size={14} />
           </button>
         </div>
 
         {/* Form Body */}
-        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '440px', overflowY: 'auto' }}>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
               Project Name *
             </label>
             <input
               type="text"
-              placeholder="e.g. Payment Gateway Engine, Search Platform..."
+              placeholder="e.g. Distributed Engine, Core Services..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               autoFocus
               style={{
                 width: '100%',
-                padding: '8px 10px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-default)',
-                fontSize: '13px',
-                fontWeight: 500,
+                padding: '7px 10px',
+                borderRadius: '5px',
+                border: '1px solid var(--border-subtle)',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                outline: 'none',
+                backgroundColor: '#ffffff',
               }}
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
                 System Domain
               </label>
               <input
                 type="text"
-                placeholder="e.g. Fintech, Developer Tools, AI"
+                placeholder="e.g. Developer Tools, Infrastructure"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-subtle)',
+                  fontSize: '11.5px',
+                  outline: 'none',
+                  backgroundColor: '#ffffff',
                 }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
-                Description (Optional)
+              <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Description
               </label>
               <input
                 type="text"
-                placeholder="High-level architecture context..."
+                placeholder="Architecture context..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-subtle)',
+                  fontSize: '11.5px',
+                  outline: 'none',
+                  backgroundColor: '#ffffff',
                 }}
               />
             </div>
           </div>
 
+          {/* Template Picker */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+            <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
               Starter Architecture Template
             </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {UNIVERSAL_TEMPLATES.map((tpl) => {
-                const isSelected = selectedTemplateId === tpl.id;
-                const IconComp = getTemplateIcon(tpl.id);
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {UNIVERSAL_TEMPLATES.map((tmpl) => {
+                const Icon = getTemplateIcon(tmpl.id);
+                const isSelected = selectedTemplateId === tmpl.id;
                 return (
                   <div
-                    key={tpl.id}
-                    onClick={() => setSelectedTemplateId(tpl.id)}
+                    key={tmpl.id}
+                    onClick={() => setSelectedTemplateId(tmpl.id)}
                     style={{
-                      padding: '10px 12px',
+                      padding: '10px',
+                      border: `1px solid ${isSelected ? '#0f172a' : 'var(--border-subtle)'}`,
+                      backgroundColor: isSelected ? 'var(--surface-subtle)' : '#ffffff',
                       borderRadius: '6px',
-                      border: `1.5px solid ${isSelected ? '#09090b' : 'var(--border-subtle)'}`,
-                      backgroundColor: isSelected ? '#09090b' : '#ffffff',
-                      color: isSelected ? '#ffffff' : 'var(--text-primary)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'flex-start',
-                      gap: '10px',
-                      transition: 'all 0.12s ease',
+                      gap: '8px',
+                      boxShadow: isSelected ? '0 0 0 1px #0f172a' : 'none',
                     }}
                   >
-                    <div
-                      style={{
-                        width: '26px',
-                        height: '26px',
-                        borderRadius: '6px',
-                        backgroundColor: isSelected ? 'rgba(255,255,255,0.15)' : '#f4f4f5',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <IconComp size={14} color={isSelected ? '#ffffff' : '#09090b'} />
-                    </div>
+                    <Icon size={16} color={isSelected ? '#0f172a' : 'var(--text-secondary)'} style={{ marginTop: '2px' }} />
                     <div>
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: isSelected ? '#ffffff' : '#09090b' }}>
-                        {tpl.name}
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {tmpl.name}
                       </div>
-                      <div style={{ fontSize: '11px', color: isSelected ? '#d4d4d8' : 'var(--text-muted)', marginTop: '2px', lineHeight: '1.3' }}>
-                        {tpl.description}
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', lineHeight: '1.3', marginTop: '2px' }}>
+                        {tmpl.description}
                       </div>
                     </div>
                   </div>
@@ -190,25 +194,16 @@ export const NewProjectModal: React.FC = () => {
               })}
             </div>
           </div>
-        </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: '12px 18px',
-            borderTop: '1px solid var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface-subtle)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-          }}
-        >
-          <button onClick={() => setNewProjectModalOpen(false)} className="btn">
-            Cancel
-          </button>
-          <button onClick={handleCreate} disabled={!name.trim()} className="btn btn-primary">
-            <FolderPlus size={14} /> Create Project
-          </button>
+          {/* Footer actions */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
+            <button onClick={() => setNewProjectModalOpen(false)} className="hupa-btn">
+              Cancel
+            </button>
+            <button onClick={handleCreate} disabled={!name.trim()} className="hupa-btn primary">
+              Create Project
+            </button>
+          </div>
         </div>
       </div>
     </div>

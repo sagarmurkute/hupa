@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { Download, Upload, Copy, Check, X, FileJson, AlertCircle } from 'lucide-react';
 
@@ -18,6 +18,18 @@ export const ExportImportModal: React.FC = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setExportModalOpen(false);
+      }
+    };
+    if (isExportModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExportModalOpen, setExportModalOpen]);
+
   if (!isExportModalOpen) return null;
 
   const currentProject = projects[activeProjectId];
@@ -30,7 +42,7 @@ export const ExportImportModal: React.FC = () => {
   };
 
   const handleDownload = () => {
-    const filename = `${currentProject?.name.toLowerCase().replace(/\s+/g, '-') || 'upg-project'}.json`;
+    const filename = `${currentProject?.name.toLowerCase().replace(/\s+/g, '-') || 'hupa-project'}.json`;
     const blob = new Blob([exportedJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -54,7 +66,7 @@ export const ExportImportModal: React.FC = () => {
         setExportModalOpen(false);
       }, 1200);
     } else {
-      setImportError('Invalid UPG Project Graph JSON structure.');
+      setImportError('Invalid HUPA Project Graph JSON structure.');
     }
   };
 
@@ -71,51 +83,50 @@ export const ExportImportModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-backdrop" onClick={() => setExportModalOpen(false)}>
+    <div className="modal-overlay" onClick={() => setExportModalOpen(false)}>
       <div
-        className="glass-panel animate-slide-down"
+        className="modal-dialog"
         style={{
-          width: '600px',
-          backgroundColor: '#ffffff',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          width: '560px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            padding: '14px 18px',
+            padding: '12px 16px',
             borderBottom: '1px solid var(--border-subtle)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: 'var(--bg-surface-subtle)',
+            backgroundColor: 'var(--surface-subtle)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileJson size={16} color="#09090b" />
-            <span style={{ fontSize: '13px', fontWeight: 600 }}>Project Data Portability</span>
+            <FileJson size={15} color="var(--text-primary)" />
+            <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Project Data Portability</span>
           </div>
-          <button onClick={() => setExportModalOpen(false)} className="btn-icon" style={{ width: '24px', height: '24px' }}>
-            <X size={15} />
+          <button
+            onClick={() => setExportModalOpen(false)}
+            className="hupa-btn ghost icon-only"
+            style={{ width: '22px', height: '22px' }}
+          >
+            <X size={14} />
           </button>
         </div>
 
         {/* Tab switch */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', padding: '0 18px' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', padding: '0 16px', backgroundColor: '#ffffff' }}>
           <button
             onClick={() => setActiveTab('export')}
             style={{
-              padding: '10px 14px',
+              padding: '8px 12px',
               border: 'none',
               background: 'none',
               fontSize: '12px',
               fontWeight: activeTab === 'export' ? 600 : 500,
-              color: activeTab === 'export' ? '#09090b' : 'var(--text-secondary)',
-              borderBottom: `2px solid ${activeTab === 'export' ? '#09090b' : 'transparent'}`,
+              color: activeTab === 'export' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              borderBottom: `2px solid ${activeTab === 'export' ? '#0f172a' : 'transparent'}`,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -127,13 +138,13 @@ export const ExportImportModal: React.FC = () => {
           <button
             onClick={() => setActiveTab('import')}
             style={{
-              padding: '10px 14px',
+              padding: '8px 12px',
               border: 'none',
               background: 'none',
               fontSize: '12px',
               fontWeight: activeTab === 'import' ? 600 : 500,
-              color: activeTab === 'import' ? '#09090b' : 'var(--text-secondary)',
-              borderBottom: `2px solid ${activeTab === 'import' ? '#09090b' : 'transparent'}`,
+              color: activeTab === 'import' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              borderBottom: `2px solid ${activeTab === 'import' ? '#0f172a' : 'transparent'}`,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -145,11 +156,11 @@ export const ExportImportModal: React.FC = () => {
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {activeTab === 'export' ? (
             <>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Export complete architectural models, nested graphs, views, relationships, and metadata.
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                Export architectural graphs, nested subsystems, perspectives, and relationships into portable JSON.
               </div>
 
               <textarea
@@ -158,79 +169,84 @@ export const ExportImportModal: React.FC = () => {
                 value={exportedJson}
                 style={{
                   width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '11px',
+                  padding: '10px 12px',
                   fontFamily: 'var(--font-mono)',
-                  backgroundColor: 'var(--bg-surface-subtle)',
+                  fontSize: '11px',
+                  backgroundColor: 'var(--surface-subtle)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '6px',
                   color: 'var(--text-primary)',
                   resize: 'none',
+                  outline: 'none',
+                  lineHeight: '1.4',
                 }}
               />
 
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button onClick={handleCopy} className="btn">
-                  {copied ? <Check size={14} color="#09090b" /> : <Copy size={14} />}
-                  <span>{copied ? 'Copied to Clipboard' : 'Copy JSON'}</span>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button onClick={handleCopy} className="hupa-btn">
+                  {copied ? <Check size={13} color="#059669" /> : <Copy size={13} />}
+                  {copied ? 'Copied' : 'Copy JSON'}
                 </button>
-                <button onClick={handleDownload} className="btn btn-primary">
-                  <Download size={14} />
-                  <span>Download .json file</span>
+                <button onClick={handleDownload} className="hupa-btn primary">
+                  <Download size={13} /> Download File (.json)
                 </button>
               </div>
             </>
           ) : (
             <>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Paste exported UPG JSON string or select a local file to restore graph architecture.
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                Paste JSON or upload a saved HUPA project graph definition to restore workspace state.
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label className="btn" style={{ cursor: 'pointer' }}>
-                  <Upload size={13} /> Select File...
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label
+                  className="hupa-btn"
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Upload size={13} /> Upload .json file
                   <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
                 </label>
-                <span style={{ fontSize: '11px', color: 'var(--text-subtle)' }}>or paste JSON below</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>or paste raw JSON below</span>
               </div>
 
               <textarea
                 rows={8}
-                placeholder="Paste UPG JSON payload here..."
                 value={importJsonText}
                 onChange={(e) => setImportJsonText(e.target.value)}
+                placeholder="Paste HUPA project JSON here..."
                 style={{
                   width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '11px',
+                  padding: '10px 12px',
                   fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  backgroundColor: 'var(--surface-subtle)',
+                  border: `1px solid ${importError ? '#e11d48' : 'var(--border-subtle)'}`,
+                  borderRadius: '6px',
+                  color: 'var(--text-primary)',
                   resize: 'none',
+                  outline: 'none',
+                  lineHeight: '1.4',
                 }}
               />
 
               {importError && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#09090b', fontSize: '12px' }}>
-                  <AlertCircle size={14} />
-                  <span>{importError}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#e11d48', fontSize: '11px' }}>
+                  <AlertCircle size={13} /> {importError}
                 </div>
               )}
 
               {importSuccess && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#09090b', fontSize: '12px' }}>
-                  <Check size={14} />
-                  <span>Graph successfully imported!</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669', fontSize: '11px' }}>
+                  <Check size={13} /> Project successfully imported!
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button onClick={() => setExportModalOpen(false)} className="btn">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button onClick={() => setExportModalOpen(false)} className="hupa-btn">
                   Cancel
                 </button>
-                <button onClick={handleImport} disabled={!importJsonText.trim()} className="btn btn-primary">
-                  <Upload size={14} />
-                  <span>Import Project</span>
+                <button onClick={handleImport} className="hupa-btn primary">
+                  <Upload size={13} /> Import Project
                 </button>
               </div>
             </>
