@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useGraphStore } from './store/useGraphStore';
+import { useAuthStore } from './store/useAuthStore';
 import { TopBar } from './components/layout/TopBar';
 import { LeftSidebar } from './components/layout/LeftSidebar';
 import { GraphCanvas } from './components/canvas/GraphCanvas';
@@ -13,6 +14,7 @@ import { CustomTypeModal } from './components/modals/CustomTypeModal';
 import { ExportImportModal } from './components/modals/ExportImportModal';
 import { StatsModal } from './components/modals/StatsModal';
 import { ShortcutsModal } from './components/modals/ShortcutsModal';
+import { AuthModal } from './components/modals/AuthModal';
 import { ContextMenu } from './components/modals/ContextMenu';
 import type { ContextMenuState } from './components/modals/ContextMenu';
 import { computeAutoLayout } from './utils/layout';
@@ -54,6 +56,8 @@ export const App: React.FC = () => {
     isRelationshipPickerOpen,
   } = useGraphStore();
 
+  const { checkSession, isAuthModalOpen } = useAuthStore();
+
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     isOpen: false,
     type: 'canvas',
@@ -63,7 +67,8 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    checkSession();
+  }, [initialize, checkSession]);
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -82,7 +87,8 @@ export const App: React.FC = () => {
         isExportModalOpen ||
         isStatsModalOpen ||
         isShortcutsModalOpen ||
-        isRelationshipPickerOpen;
+        isRelationshipPickerOpen ||
+        isAuthModalOpen;
 
       if (isInputActive) return;
 
@@ -200,6 +206,7 @@ export const App: React.FC = () => {
     isStatsModalOpen,
     isShortcutsModalOpen,
     isRelationshipPickerOpen,
+    isAuthModalOpen,
   ]);
 
   // Auto Layout trigger
@@ -277,6 +284,7 @@ export const App: React.FC = () => {
       <ExportImportModal />
       <StatsModal />
       <ShortcutsModal />
+      <AuthModal />
       <ContextMenu
         menuState={contextMenu}
         onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}

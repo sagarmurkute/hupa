@@ -242,6 +242,10 @@ export interface UPGProject {
   customRelationshipTypes: RelationshipTypeDefinition[];
   createdAt: number;
   updatedAt: number;
+  isCloud?: boolean;
+  cloudProjectId?: string;
+  syncStatus?: 'local' | 'synced' | 'pending' | 'conflict' | 'error';
+  lastSyncedAt?: number;
   metadata?: Record<string, any>;
 }
 

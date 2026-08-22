@@ -20,9 +20,8 @@ import { DEFAULT_VIEWS } from '../constants/views';
 import { BUILTIN_NODE_TYPES } from '../constants/nodeTypes';
 import { BUILTIN_RELATIONSHIP_TYPES } from '../constants/relationshipTypes';
 import { UNIVERSAL_TEMPLATES } from '../constants/templates';
-
-const LOCAL_STORAGE_KEY = 'hupa_workspace_state_v1';
-const LEGACY_STORAGE_KEY = 'upg_workspace_state_v1';
+import { localDb } from '../lib/db/indexedDb';
+import { syncEngine } from '../lib/sync/syncEngine';
 
 export interface BreadcrumbItem {
   graphId: string;
@@ -97,7 +96,7 @@ export interface GraphStoreState {
   customRelationshipTypes: Record<string, RelationshipTypeDefinition>;
 
   // Actions
-  initialize: () => void;
+  initialize: () => Promise<void>;
   saveToStorage: () => void;
   resetToTemplate: (templateId?: string) => void;
   exportProjectJson: () => string;
@@ -105,9 +104,11 @@ export interface GraphStoreState {
 
   // Project Actions
   setActiveProject: (projectId: string) => void;
-  createProject: (name: string, description: string, domain: string, templateId?: string) => void;
+  createProject: (name: string, description: string, domain: string, templateId?: string, isCloud?: boolean) => void;
   updateProject: (projectId: string, updates: Partial<UPGProject>) => void;
   deleteProject: (projectId: string) => void;
+  uploadProjectToCloud: (projectId: string) => Promise<boolean>;
+  openCloudProject: (cloudProjectId: string) => Promise<boolean>;
 
   // Navigation / Nested Graphs
   navigateToGraph: (graphId: string, pushBreadcrumb?: boolean) => void;
@@ -260,49 +261,58 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
   customNodeTypes: {},
   customRelationshipTypes: {},
 
-  initialize: () => {
+  initialize: async () => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.projects && parsed.activeProjectId && parsed.graphs && parsed.projects[parsed.activeProjectId]) {
-          const activeProj = parsed.projects[parsed.activeProjectId];
-          const activeGId = parsed.activeGraphId || activeProj.rootGraphId;
-          const rootGraph = parsed.graphs[activeGId] || parsed.graphs[activeProj.rootGraphId];
+      // 1. Check & Migrate legacy localStorage into IndexedDB
+      await localDb.checkAndMigrateLocalStorage();
 
-          set({
-            projects: parsed.projects,
-            activeProjectId: parsed.activeProjectId,
-            graphs: parsed.graphs,
-            activeGraphId: activeGId,
-            nodes: parsed.nodes || {},
-            edges: parsed.edges || {},
-            groups: parsed.groups || {},
-            documents: parsed.documents || {},
-            views: parsed.views && parsed.views.length > 0 ? parsed.views : DEFAULT_VIEWS.map((v) => ({ ...v, projectId: parsed.activeProjectId })),
-            customNodeTypes: parsed.customNodeTypes || {},
-            customRelationshipTypes: parsed.customRelationshipTypes || {},
-            breadcrumbs: parsed.breadcrumbs && parsed.breadcrumbs.length > 0 ? parsed.breadcrumbs : [
-              {
-                graphId: activeGId,
-                name: rootGraph ? rootGraph.name : 'System Architecture',
-              },
-            ],
-          });
-          return;
-        }
+      // 2. Load from IndexedDB
+      const loaded = await localDb.loadCompleteWorkspace();
+      const projKeys = Object.keys(loaded.projects);
+
+      if (projKeys.length > 0) {
+        const activePid = loaded.activeProjectId && loaded.projects[loaded.activeProjectId] ? loaded.activeProjectId : projKeys[0];
+        const activeProj = loaded.projects[activePid];
+        const activeGId = loaded.activeGraphId && loaded.graphs[loaded.activeGraphId] ? loaded.activeGraphId : activeProj.rootGraphId;
+        const rootGraph = loaded.graphs[activeGId] || loaded.graphs[activeProj.rootGraphId];
+
+        set({
+          projects: loaded.projects,
+          activeProjectId: activePid,
+          graphs: loaded.graphs,
+          activeGraphId: activeGId,
+          nodes: loaded.nodes,
+          edges: loaded.edges,
+          groups: loaded.groups,
+          documents: loaded.documents,
+          views: loaded.views && loaded.views.length > 0 ? loaded.views : DEFAULT_VIEWS.map((v) => ({ ...v, projectId: activePid })),
+          customNodeTypes: loaded.customNodeTypes || {},
+          customRelationshipTypes: loaded.customRelationshipTypes || {},
+          breadcrumbs: loaded.breadcrumbs && loaded.breadcrumbs.length > 0 ? loaded.breadcrumbs : [
+            {
+              graphId: activeGId,
+              name: rootGraph ? rootGraph.name : 'System Architecture',
+            },
+          ],
+          transform: loaded.transform || { x: 280, y: 140, zoom: 0.8 },
+        });
+
+        // Initialize sync engine
+        syncEngine.init();
+        return;
       }
     } catch (err) {
-      console.warn('Failed to load from localStorage, using clean initial template', err);
+      console.warn('Failed to load from IndexedDB, using starter template', err);
     }
 
-    // Save initial starter state
+    // Save initial starter state to IndexedDB
     get().saveToStorage();
+    syncEngine.init();
   },
 
   saveToStorage: () => {
     const state = get();
-    const payload = {
+    localDb.saveCompleteWorkspace({
       projects: state.projects,
       activeProjectId: state.activeProjectId,
       graphs: state.graphs,
@@ -315,12 +325,10 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
       customNodeTypes: state.customNodeTypes,
       customRelationshipTypes: state.customRelationshipTypes,
       breadcrumbs: state.breadcrumbs,
-    };
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
-    } catch (e) {
-      console.error('Failed to save to localStorage:', e);
-    }
+      transform: state.transform,
+    }).catch((e) => {
+      console.error('Failed to save to IndexedDB:', e);
+    });
   },
 
   resetToTemplate: (templateId = 'fullstack-web') => {
@@ -503,13 +511,22 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
 
       get().pushHistorySnapshot();
 
+      const updatedNode = { ...node, subGraphId: newSubGraphId, updatedAt: Date.now() };
+
       set((s) => ({
         graphs: { ...s.graphs, [newSubGraphId]: newSubGraph },
         nodes: {
           ...s.nodes,
-          [nodeId]: { ...node, subGraphId: newSubGraphId, updatedAt: Date.now() },
+          [nodeId]: updatedNode,
         },
       }));
+
+      get().saveToStorage();
+
+      if (state.projects[state.activeProjectId]?.isCloud) {
+        syncEngine.queueChange(state.activeProjectId, 'graph', newSubGraphId, 'CREATE', newSubGraph);
+        syncEngine.queueChange(state.activeProjectId, 'node', nodeId, 'UPDATE', updatedNode);
+      }
 
       get().navigateToGraph(newSubGraphId, true);
     }
@@ -554,7 +571,7 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     get().saveToStorage();
   },
 
-  createProject: (name: string, description: string, domain: string, templateId = 'blank') => {
+  createProject: (name: string, description: string, domain: string, templateId = 'blank', isCloud = false) => {
     const projectId = `proj-${Date.now()}`;
     const template = UNIVERSAL_TEMPLATES.find((t) => t.id === templateId) || UNIVERSAL_TEMPLATES[0];
     const data = template.createData(projectId);
@@ -562,6 +579,8 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     data.project.name = name;
     if (description.trim()) data.project.description = description;
     if (domain.trim()) data.project.domain = domain;
+    data.project.isCloud = isCloud;
+    data.project.syncStatus = isCloud ? 'pending' : 'local';
 
     const views = DEFAULT_VIEWS.map((v) => ({ ...v, projectId }));
 
@@ -582,25 +601,40 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     }));
 
     get().saveToStorage();
+
+    if (isCloud) {
+      syncEngine.uploadLocalProjectToCloud(projectId).catch((err) => {
+        console.warn('Initial cloud upload deferred to sync queue:', err);
+      });
+    }
   },
 
   updateProject: (projectId: string, updates: Partial<UPGProject>) => {
     set((s) => {
       const p = s.projects[projectId];
       if (!p) return s;
+      const updated = { ...p, ...updates, updatedAt: Date.now() };
       return {
         projects: {
           ...s.projects,
-          [projectId]: { ...p, ...updates, updatedAt: Date.now() },
+          [projectId]: updated,
         },
       };
     });
+
     get().saveToStorage();
+
+    const state = get();
+    if (state.projects[projectId]?.isCloud) {
+      syncEngine.queueChange(projectId, 'project', projectId, 'UPDATE', state.projects[projectId]);
+    }
   },
 
   deleteProject: (projectId: string) => {
     const state = get();
     get().pushHistorySnapshot();
+
+    const isCloudProject = state.projects[projectId]?.isCloud;
 
     const remainingProjects = { ...state.projects };
     delete remainingProjects[projectId];
@@ -651,6 +685,75 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
       get().saveToStorage();
     } else {
       get().resetToTemplate('blank');
+    }
+
+    if (isCloudProject) {
+      syncEngine.queueChange(projectId, 'project', projectId, 'DELETE');
+    }
+  },
+
+  uploadProjectToCloud: async (projectId: string) => {
+    try {
+      const res = await syncEngine.uploadLocalProjectToCloud(projectId);
+      if (res.success) {
+        set((s) => {
+          const p = s.projects[projectId];
+          if (!p) return s;
+          return {
+            projects: {
+              ...s.projects,
+              [projectId]: { ...p, isCloud: true, syncStatus: 'synced', lastSyncedAt: Date.now() },
+            },
+          };
+        });
+        get().saveToStorage();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
+  openCloudProject: async (cloudProjectId: string) => {
+    try {
+      const bundle = await syncEngine.downloadCloudProject(cloudProjectId);
+      if (bundle && bundle.project) {
+        const rootGraphId = bundle.project.rootGraphId || Object.keys(bundle.graphs || {})[0];
+        const newProjects = { ...get().projects, [bundle.project.id]: bundle.project };
+        const newGraphs = { ...get().graphs, ...bundle.graphs };
+        const newNodes = { ...get().nodes, ...bundle.nodes };
+        const newEdges = { ...get().edges, ...bundle.edges };
+        const newGroups = { ...get().groups, ...bundle.groups };
+        const newDocs = { ...get().documents, ...bundle.documents };
+
+        set({
+          projects: newProjects,
+          graphs: newGraphs,
+          nodes: newNodes,
+          edges: newEdges,
+          groups: newGroups,
+          documents: newDocs,
+          activeProjectId: bundle.project.id,
+          activeGraphId: rootGraphId,
+          breadcrumbs: [
+            {
+              graphId: rootGraphId,
+              name: newGraphs[rootGraphId]?.name || bundle.project.name,
+            },
+          ],
+          selectedNodeIds: [],
+          selectedEdgeIds: [],
+          selectedGroupIds: [],
+          transform: { x: 280, y: 140, zoom: 0.8 },
+        });
+
+        get().saveToStorage();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   },
 
@@ -801,6 +904,11 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     });
 
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'node', id, 'CREATE', newNode);
+    }
+
     return id;
   },
 
@@ -815,7 +923,14 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
         },
       };
     });
+
     get().saveToStorage();
+
+    const state = get();
+    const updated = state.nodes[nodeId];
+    if (updated && state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'node', nodeId, 'UPDATE', updated);
+    }
   },
 
   updateNodePosition: (nodeId: string, position: NodePosition) => {
@@ -829,6 +944,12 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
         },
       };
     });
+
+    const state = get();
+    const updated = state.nodes[nodeId];
+    if (updated && state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'node', nodeId, 'UPDATE', updated, 350);
+    }
   },
 
   updateMultipleNodePositions: (positions: Record<string, NodePosition>) => {
@@ -841,6 +962,16 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
       });
       return { nodes: updatedNodes };
     });
+
+    const state = get();
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      Object.entries(positions).forEach(([id]) => {
+        const updated = state.nodes[id];
+        if (updated) {
+          syncEngine.queueChange(state.activeProjectId, 'node', id, 'UPDATE', updated, 350);
+        }
+      });
+    }
   },
 
   updateNodeSize: (nodeId: string, size: { width: number; height: number }) => {
@@ -854,7 +985,14 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
         },
       };
     });
+
     get().saveToStorage();
+
+    const state = get();
+    const updated = state.nodes[nodeId];
+    if (updated && state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'node', nodeId, 'UPDATE', updated, 300);
+    }
   },
 
   deleteNode: (nodeId: string) => {
@@ -867,8 +1005,10 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
 
     // Remove any connected edges
     const newEdges = { ...state.edges };
+    const deletedEdgeIds: string[] = [];
     Object.keys(newEdges).forEach((edgeId) => {
       if (newEdges[edgeId].sourceNodeId === nodeId || newEdges[edgeId].targetNodeId === nodeId) {
+        deletedEdgeIds.push(edgeId);
         delete newEdges[edgeId];
       }
     });
@@ -917,6 +1057,13 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     });
 
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'node', nodeId, 'DELETE');
+      deletedEdgeIds.forEach((eId) => {
+        syncEngine.queueChange(state.activeProjectId, 'edge', eId, 'DELETE');
+      });
+    }
   },
 
   duplicateSelectedNodes: () => {
@@ -959,6 +1106,12 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     });
 
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      newlyCreatedIds.forEach((nId) => {
+        syncEngine.queueChange(state.activeProjectId, 'node', nId, 'CREATE', newNodes[nId]);
+      });
+    }
   },
 
   // Edge & Connection Handling
@@ -1054,6 +1207,11 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     });
 
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'edge', id, 'CREATE', newEdge);
+    }
+
     return id;
   },
 
@@ -1068,7 +1226,14 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
         },
       };
     });
+
     get().saveToStorage();
+
+    const state = get();
+    const updated = state.edges[edgeId];
+    if (updated && state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'edge', edgeId, 'UPDATE', updated);
+    }
   },
 
   deleteEdge: (edgeId: string) => {
@@ -1094,6 +1259,10 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     });
 
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'edge', edgeId, 'DELETE');
+    }
   },
 
   // Groups
@@ -1160,6 +1329,11 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     });
 
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'group', id, 'CREATE', newGroup);
+    }
+
     return id;
   },
 
@@ -1180,7 +1354,14 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
         },
       };
     });
+
     get().saveToStorage();
+
+    const state = get();
+    const updated = state.groups[groupId];
+    if (updated && state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'group', groupId, 'UPDATE', updated);
+    }
   },
 
   deleteGroup: (groupId: string) => {
@@ -1218,6 +1399,10 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     });
 
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'group', groupId, 'DELETE');
+    }
   },
 
   // Documents
@@ -1240,6 +1425,11 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
     }));
 
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'document', id, 'CREATE', newDoc);
+    }
+
     return id;
   },
 
@@ -1254,16 +1444,27 @@ export const useGraphStore = create<GraphStoreState>((set, get) => ({
         },
       };
     });
+
     get().saveToStorage();
+
+    const state = get();
+    const updated = state.documents[docId];
+    if (updated && state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'document', docId, 'UPDATE', updated);
+    }
   },
 
   deleteDocument: (docId) => {
-    set((s) => {
-      const docs = { ...s.documents };
-      delete docs[docId];
-      return { documents: docs };
-    });
+    const state = get();
+    const docs = { ...state.documents };
+    delete docs[docId];
+
+    set({ documents: docs });
     get().saveToStorage();
+
+    if (state.projects[state.activeProjectId]?.isCloud) {
+      syncEngine.queueChange(state.activeProjectId, 'document', docId, 'DELETE');
+    }
   },
 
   // Custom Types

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { BUILTIN_NODE_TYPES } from '../../constants/nodeTypes';
 import { UNIVERSAL_TEMPLATES } from '../../constants/templates';
 import { CustomSelect } from '../common/CustomSelect';
@@ -21,7 +22,11 @@ import {
   LayoutTemplate,
   ArrowLeft,
   GitFork,
+  User,
+  Cloud,
+  CloudUpload,
 } from 'lucide-react';
+import { syncEngine } from '../../lib/sync/syncEngine';
 import { computeAutoLayout } from '../../utils/layout';
 
 interface TopBarProps {
@@ -69,7 +74,11 @@ export const TopBar: React.FC<TopBarProps> = ({
     setActiveView,
     updateMultipleNodePositions,
     zoomToFit,
+    uploadProjectToCloud,
   } = useGraphStore();
+
+  const { user, setAuthModalOpen } = useAuthStore();
+  const [isUploadingToCloud, setIsUploadingToCloud] = useState(false);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -84,6 +93,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
+  const activeProject = projects[activeProjectId];
   const currentNodes = Object.values(nodes).filter((n) => n.graphId === activeGraphId);
   const currentEdges = Object.values(edges).filter((e) => e.graphId === activeGraphId);
   const isInsideSubGraph = breadcrumbs.length > 1;
@@ -104,8 +114,12 @@ export const TopBar: React.FC<TopBarProps> = ({
     ...Object.values(projects).map((p) => ({
       value: p.id,
       label: p.name,
-      description: p.domain || 'Project Architecture',
-      icon: <FolderGit2 size={12} color="var(--accent-indigo)" />,
+      description: `${p.isCloud ? '[Cloud] ' : '[Local] '}${p.domain || 'Project Architecture'}`,
+      icon: p.isCloud ? (
+        <Cloud size={12} color="var(--accent-indigo)" />
+      ) : (
+        <FolderGit2 size={12} color="var(--text-secondary)" />
+      ),
     })),
     {
       value: '__new__',
@@ -113,6 +127,16 @@ export const TopBar: React.FC<TopBarProps> = ({
       description: 'Start fresh or initialize from starter template',
     },
   ];
+
+  const handlePromoteToCloud = async () => {
+    if (!activeProjectId || isUploadingToCloud) return;
+    setIsUploadingToCloud(true);
+    try {
+      await uploadProjectToCloud(activeProjectId);
+    } finally {
+      setIsUploadingToCloud(false);
+    }
+  };
 
   const viewOptions = views.map((v) => ({
     value: v.id,
@@ -575,6 +599,101 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <HelpCircle size={13} />
         </button>
+
+        {/* Promote Local Project to Cloud Button (when signed in) */}
+        {user && activeProject && !activeProject.isCloud && (
+          <button
+            onClick={handlePromoteToCloud}
+            disabled={isUploadingToCloud}
+            className="hupa-btn ghost"
+            style={{
+              height: '26px',
+              padding: '0 8px',
+              fontSize: '11px',
+              gap: '4px',
+              color: 'var(--accent-indigo)',
+              fontWeight: 600,
+              backgroundColor: 'rgba(79, 70, 229, 0.05)',
+              border: '1px solid rgba(79, 70, 229, 0.2)',
+            }}
+            title="Upload and synchronize this local project to Supabase PostgreSQL"
+            aria-label="Sync local project to cloud"
+          >
+            <CloudUpload size={12} />
+            <span>{isUploadingToCloud ? 'Syncing...' : 'Sync to Cloud'}</span>
+          </button>
+        )}
+
+        {/* Cloud Project Active Indicator */}
+        {activeProject?.isCloud && (
+          <button
+            onClick={() => syncEngine.triggerSync()}
+            className="hupa-btn ghost icon-only"
+            title="Cloud Project (Synchronized with Supabase PostgreSQL) — Click to force sync"
+            aria-label="Force synchronize cloud project"
+            style={{ color: 'var(--accent-indigo)' }}
+          >
+            <Cloud size={13} />
+          </button>
+        )}
+
+        <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-subtle)', margin: '0 2px' }} aria-hidden="true" />
+
+        {/* Better Auth Account Button */}
+        {user ? (
+          <button
+            onClick={() => setAuthModalOpen(true, 'account')}
+            className="hupa-btn ghost"
+            style={{
+              height: '26px',
+              padding: '0 8px',
+              fontSize: '11px',
+              gap: '6px',
+              fontWeight: 600,
+              backgroundColor: 'rgba(79, 70, 229, 0.08)',
+              color: 'var(--accent-indigo)',
+              border: '1px solid rgba(79, 70, 229, 0.2)',
+            }}
+            title={`Signed in as ${user.email}`}
+            aria-label="Account Settings"
+          >
+            <span
+              style={{
+                width: '14px',
+                height: '14px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--accent-indigo)',
+                color: '#ffffff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '9px',
+                fontWeight: 700,
+              }}
+            >
+              {user.name ? user.name[0].toUpperCase() : 'U'}
+            </span>
+            <span style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user.name || user.email}
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setAuthModalOpen(true, 'signin')}
+            className="hupa-btn ghost"
+            style={{
+              height: '26px',
+              padding: '0 8px',
+              fontSize: '11px',
+              gap: '4px',
+              color: 'var(--text-secondary)',
+            }}
+            title="Sign in with Better Auth"
+            aria-label="Sign In"
+          >
+            <User size={12} /> Sign In
+          </button>
+        )}
       </div>
     </header>
   );

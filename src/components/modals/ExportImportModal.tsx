@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
-import { Download, Upload, Copy, Check, X, FileJson, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useSyncStore } from '../../store/useSyncStore';
+import { syncEngine } from '../../lib/sync/syncEngine';
+import {
+  Download,
+  Upload,
+  Copy,
+  Check,
+  X,
+  FileJson,
+  AlertCircle,
+  Cloud,
+  RefreshCw,
+  FolderGit2,
+} from 'lucide-react';
 
 export const ExportImportModal: React.FC = () => {
   const {
@@ -10,13 +24,24 @@ export const ExportImportModal: React.FC = () => {
     importProjectJson,
     projects,
     activeProjectId,
+    openCloudProject,
   } = useGraphStore();
 
-  const [activeTab, setActiveTab] = useState<'export' | 'import'>('export');
+  const { user } = useAuthStore();
+  const { cloudProjectsList, isLoadingCloudProjects } = useSyncStore();
+
+  const [activeTab, setActiveTab] = useState<'export' | 'import' | 'cloud'>('export');
   const [copied, setCopied] = useState(false);
   const [importJsonText, setImportJsonText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [openingCloudId, setOpeningCloudId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isExportModalOpen && user && activeTab === 'cloud') {
+      syncEngine.fetchCloudProjects();
+    }
+  }, [isExportModalOpen, user, activeTab]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -82,12 +107,24 @@ export const ExportImportModal: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const handleOpenRemoteProject = async (cloudProjectId: string) => {
+    setOpeningCloudId(cloudProjectId);
+    try {
+      const success = await openCloudProject(cloudProjectId);
+      if (success) {
+        setExportModalOpen(false);
+      }
+    } finally {
+      setOpeningCloudId(null);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={() => setExportModalOpen(false)}>
       <div
         className="modal-dialog"
         style={{
-          width: '560px',
+          width: '580px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -104,7 +141,7 @@ export const ExportImportModal: React.FC = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileJson size={15} color="var(--text-primary)" />
-            <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Project Data Portability</span>
+            <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Project Data Portability & Cloud Sync</span>
           </div>
           <button
             onClick={() => setExportModalOpen(false)}
@@ -153,11 +190,34 @@ export const ExportImportModal: React.FC = () => {
           >
             <Upload size={13} /> Import JSON
           </button>
+          {user && (
+            <button
+              onClick={() => {
+                setActiveTab('cloud');
+                syncEngine.fetchCloudProjects();
+              }}
+              style={{
+                padding: '8px 12px',
+                border: 'none',
+                background: 'none',
+                fontSize: '12px',
+                fontWeight: activeTab === 'cloud' ? 600 : 500,
+                color: activeTab === 'cloud' ? 'var(--accent-indigo)' : 'var(--text-secondary)',
+                borderBottom: `2px solid ${activeTab === 'cloud' ? 'var(--accent-indigo)' : 'transparent'}`,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Cloud size={13} /> Cloud Projects
+            </button>
+          )}
         </div>
 
         {/* Modal Body */}
         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {activeTab === 'export' ? (
+          {activeTab === 'export' && (
             <>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
                 Export architectural graphs, nested subsystems, perspectives, and relationships into portable JSON.
@@ -192,7 +252,9 @@ export const ExportImportModal: React.FC = () => {
                 </button>
               </div>
             </>
-          ) : (
+          )}
+
+          {activeTab === 'import' && (
             <>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
                 Paste JSON or upload a saved HUPA project graph definition to restore workspace state.
@@ -249,6 +311,88 @@ export const ExportImportModal: React.FC = () => {
                   <Upload size={13} /> Import Project
                 </button>
               </div>
+            </>
+          )}
+
+          {activeTab === 'cloud' && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                  Cloud architecture projects available on your account (Supabase PostgreSQL):
+                </div>
+                <button
+                  onClick={() => syncEngine.fetchCloudProjects()}
+                  disabled={isLoadingCloudProjects}
+                  className="hupa-btn ghost icon-only"
+                  title="Refresh cloud projects list"
+                >
+                  <RefreshCw size={12} className={isLoadingCloudProjects ? 'spin' : ''} />
+                </button>
+              </div>
+
+              {isLoadingCloudProjects && (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '11.5px' }}>
+                  Loading cloud projects...
+                </div>
+              )}
+
+              {!isLoadingCloudProjects && cloudProjectsList.length === 0 && (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '11.5px', backgroundColor: 'var(--surface-subtle)', borderRadius: '6px' }}>
+                  No cloud projects found on your account. Create a cloud project or sync an existing local project.
+                </div>
+              )}
+
+              {!isLoadingCloudProjects && cloudProjectsList.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '240px', overflowY: 'auto' }}>
+                  {cloudProjectsList.map((cp) => {
+                    const isCurrent = cp.id === activeProjectId;
+                    const isOpening = openingCloudId === cp.id;
+                    return (
+                      <div
+                        key={cp.id}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: `1px solid ${isCurrent ? 'var(--accent-indigo)' : 'var(--border-subtle)'}`,
+                          backgroundColor: isCurrent ? 'rgba(79, 70, 229, 0.04)' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <FolderGit2 size={14} color="var(--accent-indigo)" />
+                          <div>
+                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {cp.name} {isCurrent && <span style={{ fontSize: '10px', color: 'var(--accent-indigo)' }}>(Active)</span>}
+                            </div>
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                              {cp.domain || 'Architecture Graph'} &bull; Updated {new Date(cp.updatedAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          {isCurrent ? (
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--status-completed)' }}>
+                              Loaded
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenRemoteProject(cp.id)}
+                              disabled={isOpening}
+                              className="hupa-btn"
+                              style={{ height: '24px', padding: '0 8px', fontSize: '10.5px' }}
+                            >
+                              {isOpening ? 'Opening...' : 'Open & Sync'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
         </div>

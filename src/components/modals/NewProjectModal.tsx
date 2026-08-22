@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { UNIVERSAL_TEMPLATES } from '../../constants/templates';
-import { FolderPlus, X, Box, Globe, Server, Bot, FileCode } from 'lucide-react';
+import { FolderPlus, X, Box, Globe, Server, Bot, FileCode, Cloud, Database } from 'lucide-react';
 
 export const NewProjectModal: React.FC = () => {
   const { isNewProjectModalOpen, setNewProjectModalOpen, createProject } = useGraphStore();
+  const { user } = useAuthStore();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [domain, setDomain] = useState('Systems & Web');
   const [selectedTemplateId, setSelectedTemplateId] = useState('fullstack-web');
+  const [isCloud, setIsCloud] = useState(true);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,7 +49,8 @@ export const NewProjectModal: React.FC = () => {
       name.trim(),
       description.trim(),
       domain.trim() || 'Software Architecture',
-      selectedTemplateId
+      selectedTemplateId,
+      isCloud && Boolean(user)
     );
     setName('');
     setDescription('');
@@ -154,6 +158,58 @@ export const NewProjectModal: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Storage Destination Option */}
+          {user && (
+            <div>
+              <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                Storage & Synchronization Target
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div
+                  onClick={() => setIsCloud(true)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: `1px solid ${isCloud ? 'var(--accent-indigo)' : 'var(--border-subtle)'}`,
+                    backgroundColor: isCloud ? 'rgba(79, 70, 229, 0.05)' : '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: isCloud ? '0 0 0 1px var(--accent-indigo)' : 'none',
+                  }}
+                >
+                  <Cloud size={16} color="var(--accent-indigo)" />
+                  <div>
+                    <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>Cloud Synced</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Supabase PostgreSQL + Local DB</div>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setIsCloud(false)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: `1px solid ${!isCloud ? '#0f172a' : 'var(--border-subtle)'}`,
+                    backgroundColor: !isCloud ? 'var(--surface-subtle)' : '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: !isCloud ? '0 0 0 1px #0f172a' : 'none',
+                  }}
+                >
+                  <Database size={16} color="var(--text-primary)" />
+                  <div>
+                    <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>Local Only</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>IndexedDB (browser storage)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Template Picker */}
           <div>
