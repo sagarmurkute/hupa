@@ -1,14 +1,42 @@
 {
   "name": "hupa",
-  "private": true,
-  "version": "0.0.0",
+  "productName": "HUPA",
+  "description": "Universal Project Graph Environment for Developers",
+  "version": "0.1.0",
+  "author": "Sagar Murkute",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sagarmurkute/hupa.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sagarmurkute/hupa/issues"
+  },
+  "homepage": "https://github.com/sagarmurkute/hupa#readme",
+  "keywords": [
+    "architecture",
+    "knowledge-graph",
+    "developer-tools",
+    "system-design",
+    "local-first",
+    "electron",
+    "better-auth",
+    "supabase",
+    "react19"
+  ],
+  "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -p \"[{name}]\" -n \"SERVER,CLIENT\" -c \"cyan.bold,magenta.bold\" \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
+    "dev:desktop": "npm run build:electron && concurrently -k -n \"SERVER,CLIENT,ELECTRON\" -c \"magenta.bold,cyan.bold,yellow.bold\" \"npm run dev:server\" \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron dist-electron/main.js\"",
     "server": "tsx server/index.ts",
     "build": "tsc -b && vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:renderer": "tsc -b && vite build",
+    "build:desktop": "npm run build:renderer && npm run build:electron",
+    "package:win": "npm run build:desktop && electron-builder --win --x64",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -38,9 +66,45 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
     "oxlint": "^1.75.0",
     "tsx": "^4.23.12",
     "typescript": "~6.0.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "wait-on": "^9.1.0"
+  },
+  "build": {
+    "appId": "com.hupa.desktop",
+    "productName": "HUPA",
+    "copyright": "Copyright © 2026 Sagar Murkute & HUPA Contributors",
+    "asar": true,
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "build/icon.ico",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "HUPA",
+      "uninstallDisplayName": "HUPA Architecture Studio"
+    }
   }
 }

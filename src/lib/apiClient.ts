@@ -1,4 +1,5 @@
 import type { SyncQueueItem, SyncBatchResult } from './sync/syncTypes';
+import { getApiBaseUrl } from './authClient';
 
 export interface CloudProject {
   id: string;
@@ -25,7 +26,8 @@ export interface CloudProjectBundle {
 
 export const apiClient = {
   async checkHealth(): Promise<{ status: string; service: string }> {
-    const res = await fetch('/api/health', {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/health`, {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     });
@@ -36,7 +38,8 @@ export const apiClient = {
   },
 
   async listProjects(): Promise<{ projects: CloudProject[] }> {
-    const res = await fetch('/api/projects', {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/projects`, {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     });
@@ -47,7 +50,8 @@ export const apiClient = {
   },
 
   async createProject(data: { name: string; description?: string; domain?: string }): Promise<{ project: CloudProject }> {
-    const res = await fetch('/api/projects', {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -61,7 +65,8 @@ export const apiClient = {
   },
 
   async uploadLocalProject(bundle: CloudProjectBundle): Promise<{ success: boolean; project: { id: string; isCloud: boolean } }> {
-    const res = await fetch('/api/projects/upload-local', {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/projects/upload-local`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -75,6 +80,7 @@ export const apiClient = {
   },
 
   async syncBatchChanges(projectId: string, changes: SyncQueueItem[]): Promise<SyncBatchResult> {
+    const base = getApiBaseUrl();
     const payload = {
       clientId: changes[0]?.clientId,
       changes: changes.map((c) => ({
@@ -87,7 +93,7 @@ export const apiClient = {
       })),
     };
 
-    const res = await fetch(`/api/projects/${projectId}/sync-changes`, {
+    const res = await fetch(`${base}/api/projects/${projectId}/sync-changes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -103,7 +109,8 @@ export const apiClient = {
   },
 
   async getProjectBundle(projectId: string): Promise<CloudProjectBundle> {
-    const res = await fetch(`/api/projects/${projectId}/bundle`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/projects/${projectId}/bundle`, {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     });
@@ -114,7 +121,8 @@ export const apiClient = {
   },
 
   async saveProjectSnapshot(projectId: string, bundle: Partial<CloudProjectBundle>): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`/api/projects/${projectId}/save-snapshot`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/projects/${projectId}/save-snapshot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -128,7 +136,8 @@ export const apiClient = {
   },
 
   async deleteProject(projectId: string): Promise<{ success: boolean }> {
-    const res = await fetch(`/api/projects/${projectId}`, {
+    const base = getApiBaseUrl();
+    const res = await fetch(`${base}/api/projects/${projectId}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

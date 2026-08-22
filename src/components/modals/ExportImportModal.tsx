@@ -77,6 +77,34 @@ export const ExportImportModal: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleNativeSave = async () => {
+    if (!window.electronAPI) return;
+    const filename = `${currentProject?.name.toLowerCase().replace(/\s+/g, '-') || 'hupa-project'}.json`;
+    const res = await window.electronAPI.saveProjectFile(filename, exportedJson);
+    if (!res.canceled && !res.error) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleNativeOpen = async () => {
+    if (!window.electronAPI) return;
+    const res = await window.electronAPI.openProjectFile();
+    if (!res.canceled && res.content) {
+      setImportJsonText(res.content);
+      const success = importProjectJson(res.content);
+      if (success) {
+        setImportSuccess(true);
+        setTimeout(() => {
+          setImportSuccess(false);
+          setExportModalOpen(false);
+        }, 1200);
+      } else {
+        setImportError('Invalid HUPA Project Graph JSON structure.');
+      }
+    }
+  };
+
   const handleImport = () => {
     if (!importJsonText.trim()) {
       setImportError('Please paste a valid JSON string.');
@@ -247,9 +275,15 @@ export const ExportImportModal: React.FC = () => {
                   {copied ? <Check size={13} color="#059669" /> : <Copy size={13} />}
                   {copied ? 'Copied' : 'Copy JSON'}
                 </button>
-                <button onClick={handleDownload} className="hupa-btn primary">
-                  <Download size={13} /> Download File (.json)
-                </button>
+                {window.electronAPI?.isDesktop ? (
+                  <button onClick={handleNativeSave} className="hupa-btn primary">
+                    <Download size={13} /> Save File As... (.json)
+                  </button>
+                ) : (
+                  <button onClick={handleDownload} className="hupa-btn primary">
+                    <Download size={13} /> Download File (.json)
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -257,17 +291,27 @@ export const ExportImportModal: React.FC = () => {
           {activeTab === 'import' && (
             <>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
-                Paste JSON or upload a saved HUPA project graph definition to restore workspace state.
+                Paste JSON or open a saved HUPA project graph file to restore workspace state.
               </div>
 
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <label
-                  className="hupa-btn"
-                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Upload size={13} /> Upload .json file
-                  <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
-                </label>
+                {window.electronAPI?.isDesktop ? (
+                  <button
+                    onClick={handleNativeOpen}
+                    className="hupa-btn"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Upload size={13} /> Open Project File (.json)...
+                  </button>
+                ) : (
+                  <label
+                    className="hupa-btn"
+                    style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Upload size={13} /> Upload .json file
+                    <input type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
+                  </label>
+                )}
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>or paste raw JSON below</span>
               </div>
 
