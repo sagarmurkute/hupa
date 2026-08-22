@@ -4,6 +4,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
+const vercelProdUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '';
+const appUrl = process.env.BETTER_AUTH_URL || process.env.APP_URL || vercelProdUrl || vercelUrl || 'http://localhost:5173';
+
 export const auth = betterAuth({
   database: pool,
   emailAndPassword: {
@@ -20,12 +24,15 @@ export const auth = betterAuth({
     },
   },
   secret: process.env.BETTER_AUTH_SECRET || 'hupa-dev-secret-replace-in-production-min-32-chars-key',
-  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:5173',
+  baseURL: appUrl,
   trustedOrigins: [
     'http://localhost:5173',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://127.0.0.1:5173',
     process.env.APP_URL || '',
+    process.env.BETTER_AUTH_URL || '',
+    vercelUrl,
+    vercelProdUrl,
   ].filter(Boolean),
 });
