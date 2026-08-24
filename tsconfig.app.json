@@ -20,7 +20,31 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Path Aliases */
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@hupa/core": ["packages/core/src/index.ts"],
+      "@hupa/core/*": ["packages/core/src/*"],
+      "@hupa/graph": ["packages/graph/src/index.ts"],
+      "@hupa/graph/*": ["packages/graph/src/*"],
+      "@hupa/shared": ["packages/shared/src/index.ts"],
+      "@hupa/shared/*": ["packages/shared/src/*"],
+      "@hupa/storage": ["packages/storage/src/index.ts"],
+      "@hupa/storage/*": ["packages/storage/src/*"],
+      "@hupa/auth": ["packages/auth/src/index.ts"],
+      "@hupa/auth/*": ["packages/auth/src/*"],
+      "@hupa/sync": ["packages/sync/src/index.ts"],
+      "@hupa/sync/*": ["packages/sync/src/*"],
+      "@hupa/state": ["packages/state/src/index.ts"],
+      "@hupa/state/*": ["packages/state/src/*"],
+      "@hupa/ui": ["packages/ui/src/index.ts"],
+      "@hupa/ui/*": ["packages/ui/src/*"],
+      "@hupa/editor": ["packages/editor/src/index.ts"],
+      "@hupa/editor/*": ["packages/editor/src/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["apps/**/*", "packages/**/*"]
 }

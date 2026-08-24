@@ -4,12 +4,12 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "dist-electron",
-    "rootDir": "electron",
+    "rootDir": "apps/desktop",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "ignoreDeprecations": "6.0"
   },
-  "include": ["electron/**/*"]
+  "include": ["apps/desktop/**/*"]
 }
