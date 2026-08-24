@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from '../components/landing/Navbar';
 import { Footer } from '../components/landing/Footer';
 import { Search, ArrowLeft, ArrowRight, FileText, Terminal, Layers, Database, HardDrive, Monitor } from 'lucide-react';
+import { useSmoothScroll } from '../components/landing/useScrollReveal';
 import '../styles/landing.css';
-
 
 interface DocsPageProps {
   onNavigate: (route: string) => void;
@@ -31,7 +31,7 @@ const DOCS_DATA: DocArticle[] = [
     id: 'getting-started',
     title: 'Getting Started',
     category: 'QUICK START',
-    icon: <Terminal size={16} />,
+    icon: <Terminal size={15} />,
     content: {
       summary: 'Step-by-step guide to cloning, configuring, and launching HUPA locally in web or desktop mode.',
       sections: [
@@ -77,7 +77,7 @@ npm run dev:desktop`,
     id: 'architecture',
     title: 'System Architecture',
     category: 'CORE SPECIFICATIONS',
-    icon: <Layers size={16} />,
+    icon: <Layers size={15} />,
     content: {
       summary: 'Detailed breakdown of the Local-First Shared-Core architecture, client-server topology, and sync protocols.',
       sections: [
@@ -106,7 +106,7 @@ npm run dev:desktop`,
                                                 HTTP Sync API / JSON
                                                          │
                                                          ▼
-+────────────────────────────────────────────────────────────────---------+
++-------------------------------------------------------------------------+
 |                        HUPA BACKEND (Express 5)                         |
 |                                                                         |
 |  [ Better Auth Session Middleware ] ---> [ /api/projects Router ]       |
@@ -114,7 +114,7 @@ npm run dev:desktop`,
 |                                                  ▼                      |
 |                         [ Supabase PostgreSQL Database ]                |
 |               (projects, graphs, nodes, edges, groups, documents)       |
-+────────────────────────────────────────────────────────────────---------+`,
++-------------------------------------------------------------------------+`,
         },
       ],
     },
@@ -123,7 +123,7 @@ npm run dev:desktop`,
     id: 'graph-data-model',
     title: 'Graph Data Model',
     category: 'SCHEMAS & TYPES',
-    icon: <FileText size={16} />,
+    icon: <FileText size={15} />,
     content: {
       summary: 'Data models for projects, subsystem graphs, nodes, edges, groups, and perspectives.',
       sections: [
@@ -173,7 +173,7 @@ npm run dev:desktop`,
     id: 'local-first-and-sync',
     title: 'Local-First & Sync',
     category: 'PERSISTENCE & SYNC',
-    icon: <HardDrive size={16} />,
+    icon: <HardDrive size={15} />,
     content: {
       summary: 'Specifications for client-side IndexedDB stores, mutation queues, debouncing, and tombstone conflict resolution.',
       sections: [
@@ -201,7 +201,7 @@ npm run dev:desktop`,
     id: 'database-and-auth',
     title: 'Database & Auth',
     category: 'BACKEND & SECURITY',
-    icon: <Database size={16} />,
+    icon: <Database size={15} />,
     content: {
       summary: 'PostgreSQL schema definitions, Better Auth integration, and session security.',
       sections: [
@@ -220,7 +220,7 @@ npm run dev:desktop`,
     id: 'desktop-application',
     title: 'Windows Desktop App',
     category: 'DESKTOP INTEGRATION',
-    icon: <Monitor size={16} />,
+    icon: <Monitor size={15} />,
     content: {
       summary: 'Electron 43 desktop application architecture, native file dialogs, and packaging.',
       sections: [
@@ -242,6 +242,8 @@ export const DocsPage: React.FC<DocsPageProps> = ({ onNavigate, initialDoc }) =>
   const [activeDocId, setActiveDocId] = useState<string>(initialDoc || 'getting-started');
   const [searchQuery, setSearchQuery] = useState('');
 
+  useSmoothScroll();
+
   useEffect(() => {
     document.title = 'Documentation — HUPA Universal Project Graph';
     window.scrollTo(0, 0);
@@ -252,202 +254,132 @@ export const DocsPage: React.FC<DocsPageProps> = ({ onNavigate, initialDoc }) =>
   const filteredDocs = DOCS_DATA.filter((d) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    return d.title.toLowerCase().includes(q) || d.content.summary.toLowerCase().includes(q) || d.category.toLowerCase().includes(q);
+    return (
+      d.title.toLowerCase().includes(q) ||
+      d.content.summary.toLowerCase().includes(q) ||
+      d.category.toLowerCase().includes(q)
+    );
   });
 
   return (
-    <div className="landing-viewport">
+    <div className="landing-root">
       <Navbar onNavigate={onNavigate} />
 
-      <main style={{ minHeight: '80vh', borderBottom: '1px solid #e5e5e5' }}>
-        <div className="landing-container" style={{ padding: '3rem 2rem' }}>
-          {/* Top Breadcrumb & Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <main className="land-subpage">
+        <div className="land-container">
+          {/* Header */}
+          <div className="land-subpage-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
             <div>
-              <div className="section-kicker">
-                <span>Developer Documentation</span>
-              </div>
-              <h1 className="section-heading-large" style={{ fontSize: '2.5rem' }}>
-                HUPA Documentation
-              </h1>
+              <div className="land-section-label">Developer Documentation</div>
+              <h1 className="land-subpage-title">HUPA Docs</h1>
+              <p className="land-subpage-lead">
+                Explore architecture specifications, data schemas, sync protocols, and developer setup.
+              </p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <button onClick={() => onNavigate('/')} className="mono-btn mono-btn-secondary" style={{ padding: '0.5rem 1rem' }}>
-                <ArrowLeft size={14} /> Back to Home
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button
+                onClick={() => onNavigate('/')}
+                className="land-btn-secondary"
+                style={{ height: 38, padding: '0 16px', fontSize: 13 }}
+              >
+                <ArrowLeft size={14} />
+                <span>Home</span>
               </button>
-              <button onClick={() => onNavigate('/app')} className="mono-btn mono-btn-primary" style={{ padding: '0.5rem 1.25rem' }}>
-                Open HUPA <ArrowRight size={14} />
+              <button
+                onClick={() => onNavigate('/app')}
+                className="land-btn-primary"
+                style={{ height: 38, padding: '0 18px', fontSize: 13 }}
+              >
+                <span>Launch Studio</span>
+                <ArrowRight size={14} />
               </button>
             </div>
           </div>
 
-          {/* Docs Layout Grid */}
-          <div
-            style={{
-              border: '1px solid #000000',
-              backgroundColor: '#ffffff',
-              display: 'grid',
-              gridTemplateColumns: '280px 1fr',
-            }}
-          >
-            {/* Left Sidebar */}
-            <aside style={{ borderRight: '1px solid #e5e5e5', backgroundColor: '#fafafa', padding: '1.5rem 0' }}>
-              {/* Search Bar */}
-              <div style={{ padding: '0 1.25rem', marginBottom: '1.25rem' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    border: '1px solid #d4d4d4',
-                    backgroundColor: '#ffffff',
-                    padding: '0.4rem 0.6rem',
-                  }}
-                >
-                  <Search size={14} color="#737373" />
-                  <input
-                    type="text"
-                    placeholder="Search docs..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{
-                      border: 'none',
-                      outline: 'none',
-                      fontSize: '0.8125rem',
-                      width: '100%',
-                      fontFamily: 'var(--hupa-font-sans)',
-                    }}
-                  />
-                </div>
+          {/* Docs Layout */}
+          <div className="land-docs-layout">
+            {/* Sidebar */}
+            <aside className="land-docs-sidebar">
+              <div className="land-docs-search">
+                <Search size={14} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--land-text-4)' }} />
+                <input
+                  type="text"
+                  placeholder="Search docs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
 
-              {/* Doc List */}
-              <nav aria-label="Documentation Index">
+              <div className="land-docs-nav-group">
+                <div className="land-docs-nav-label">Table of Contents</div>
                 {filteredDocs.map((doc) => (
                   <button
                     key={doc.id}
                     onClick={() => setActiveDocId(doc.id)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '0.85rem 1.25rem',
-                      border: 'none',
-                      borderLeft: activeDocId === doc.id ? '3px solid #000000' : '3px solid transparent',
-                      backgroundColor: activeDocId === doc.id ? '#ffffff' : 'transparent',
-                      color: activeDocId === doc.id ? '#000000' : '#525252',
-                      fontWeight: activeDocId === doc.id ? 700 : 500,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.6rem',
-                      fontSize: '0.875rem',
-                      transition: 'all 0.1s ease',
-                    }}
+                    className={`land-docs-nav-item ${activeDocId === doc.id ? 'is-active' : ''}`}
                   >
-                    {doc.icon}
+                    <span style={{ opacity: 0.6 }}>{doc.icon}</span>
                     <span>{doc.title}</span>
                   </button>
                 ))}
-              </nav>
+              </div>
             </aside>
 
-            {/* Right Document Content */}
-            <article style={{ padding: '3rem', maxWidth: '840px' }}>
-              <div
-                style={{
-                  fontFamily: 'var(--hupa-font-mono)',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  color: '#737373',
-                  marginBottom: '0.5rem',
-                }}
-              >
+            {/* Article */}
+            <article className="land-docs-article">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--land-text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
                 {activeDoc.category}
               </div>
 
-              <h2
-                style={{
-                  fontFamily: 'var(--hupa-font-display)',
-                  fontSize: '2.25rem',
-                  fontWeight: 700,
-                  letterSpacing: '-0.03em',
-                  marginBottom: '1rem',
-                }}
-              >
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(24px, 3vw, 36px)', fontWeight: 600, color: 'var(--land-text-hero)', letterSpacing: '-0.025em', margin: '0 0 14px' }}>
                 {activeDoc.title}
               </h2>
 
-              <p style={{ fontSize: '1.125rem', color: 'var(--hupa-gray-2)', lineHeight: 1.6, marginBottom: '2.5rem' }}>
+              <p style={{ fontSize: 15, color: 'var(--land-text-2)', lineHeight: 1.65, margin: '0 0 36px', fontWeight: 300 }}>
                 {activeDoc.content.summary}
               </p>
 
               {/* Sections */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+              <div style={{ display: 'grid', gap: 36 }}>
                 {activeDoc.content.sections.map((sec, idx) => (
-                  <div key={sec.heading} style={{ borderTop: idx > 0 ? '1px solid #e5e5e5' : 'none', paddingTop: idx > 0 ? '2rem' : 0 }}>
-                    <h3
-                      style={{
-                        fontFamily: 'var(--hupa-font-display)',
-                        fontSize: '1.35rem',
-                        fontWeight: 700,
-                        letterSpacing: '-0.02em',
-                        marginBottom: '0.75rem',
-                      }}
-                    >
+                  <div key={sec.heading} style={{ borderTop: idx > 0 ? '1px solid var(--land-border)' : 'none', paddingTop: idx > 0 ? 28 : 0 }}>
+                    <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--land-text-hero)', margin: '0 0 10px', letterSpacing: '-0.015em' }}>
                       {sec.heading}
                     </h3>
-                    <p style={{ fontSize: '0.9375rem', lineHeight: 1.6, color: 'var(--hupa-gray-1)', marginBottom: sec.code || sec.table ? '1rem' : 0 }}>
+                    <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--land-text-2)', margin: '0 0 14px', fontWeight: 300 }}>
                       {sec.text}
                     </p>
 
                     {/* Code Block */}
                     {sec.code && (
-                      <pre
-                        style={{
-                          backgroundColor: '#000000',
-                          color: '#ffffff',
-                          padding: '1.25rem',
-                          fontFamily: 'var(--hupa-font-mono)',
-                          fontSize: '0.8125rem',
-                          lineHeight: 1.5,
-                          overflowX: 'auto',
-                          border: '1px solid #262626',
-                          marginTop: '0.75rem',
-                        }}
-                      >
+                      <pre className="land-docs-code">
                         <code>{sec.code}</code>
                       </pre>
                     )}
 
                     {/* Table */}
                     {sec.table && (
-                      <table
-                        style={{
-                          width: '100%',
-                          borderCollapse: 'collapse',
-                          marginTop: '1rem',
-                          fontFamily: 'var(--hupa-font-mono)',
-                          fontSize: '0.8125rem',
-                        }}
-                      >
-                        <thead>
-                          <tr style={{ backgroundColor: '#000000', color: '#ffffff' }}>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left' }}>{sec.table[0].col1}</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left' }}>{sec.table[0].col2}</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left' }}>{sec.table[0].col3}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sec.table.slice(1).map((row, rIdx) => (
-                            <tr key={rIdx} style={{ borderBottom: '1px solid #e5e5e5' }}>
-                              <td style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>{row.col1}</td>
-                              <td style={{ padding: '0.6rem 0.8rem', color: '#737373' }}>{row.col2}</td>
-                              <td style={{ padding: '0.6rem 0.8rem' }}>{row.col3}</td>
+                      <div style={{ overflowX: 'auto', border: '1px solid var(--land-border)', borderRadius: 10, marginTop: 12 }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, fontFamily: 'var(--font-mono)' }}>
+                          <thead>
+                            <tr style={{ background: 'var(--land-surface)', color: 'var(--land-text-hero)' }}>
+                              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 500 }}>{sec.table[0].col1}</th>
+                              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 500 }}>{sec.table[0].col2}</th>
+                              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 500 }}>{sec.table[0].col3}</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {sec.table.slice(1).map((row, rIdx) => (
+                              <tr key={rIdx} style={{ borderTop: '1px solid var(--land-border)' }}>
+                                <td style={{ padding: '10px 14px', fontWeight: 500, color: 'var(--land-text)' }}>{row.col1}</td>
+                                <td style={{ padding: '10px 14px', color: 'var(--land-text-3)' }}>{row.col2}</td>
+                                <td style={{ padding: '10px 14px', color: 'var(--land-text-2)' }}>{row.col3}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 ))}
