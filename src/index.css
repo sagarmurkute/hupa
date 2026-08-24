@@ -89,10 +89,13 @@
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 html, body, #root {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+  width: 100%;
+  min-height: 100%;
   font-family: var(--font-sans);
   background-color: var(--canvas-bg);
   color: var(--text-primary);
@@ -101,6 +104,7 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
 
 button, input, textarea, select {
   font-family: inherit;
@@ -136,11 +140,15 @@ button, input, textarea, select {
 .app-container {
   display: flex;
   flex-direction: column;
+  position: fixed;
+  inset: 0;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: var(--canvas-bg);
+  background-color: var(--canvas-bg);
+  z-index: 1;
 }
+
 
 /* Spatial Top Bar */
 .topbar {
