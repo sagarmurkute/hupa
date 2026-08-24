@@ -1,25 +1,33 @@
 import React from 'react';
 
 const LOGOS = [
-  { name: 'TypeScript 5.8', icon: '⚡' },
-  { name: 'Electron 43', icon: '💻' },
-  { name: 'Supabase Postgres', icon: '⚡' },
-  { name: 'IndexedDB 3.0', icon: '💾' },
-  { name: 'Vite 6', icon: '🚀' },
-  { name: 'React 18', icon: '⚛️' },
-  { name: 'WASM Core', icon: '🛠️' },
+  'React 19',
+  'TypeScript 6',
+  'Electron 43',
+  'Supabase',
+  'IndexedDB',
+  'Vite 8',
+  'WASM',
+  'PostgreSQL',
+  'Better Auth',
+  'Zustand',
 ];
 
 export const LogoCloudSection: React.FC = () => {
+  // Duplicate for seamless loop
+  const items = [...LOGOS, ...LOGOS];
+
   return (
-    <section className="logo-cloud-section">
-      <div className="container">
-        <div className="logo-cloud-text">BUILT WITH MODERN DEVELOPER ENGINE PRIMITIVES</div>
-        <div className="logo-cloud-grid">
-          {LOGOS.map((logo) => (
-            <div key={logo.name} className="logo-item">
-              <span>{logo.icon}</span>
-              <span>{logo.name}</span>
+    <section className="land-trust">
+      <div className="land-container">
+        <div className="land-trust-label">Built with production-grade primitives</div>
+      </div>
+      <div style={{ overflow: 'hidden' }}>
+        <div className="land-trust-track">
+          {items.map((name, i) => (
+            <div key={`${name}-${i}`} className="land-trust-item">
+              <span style={{ opacity: 0.3 }}>◆</span>
+              <span>{name}</span>
             </div>
           ))}
         </div>
