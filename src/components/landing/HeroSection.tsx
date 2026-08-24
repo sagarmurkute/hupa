@@ -278,8 +278,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
                         y1={`${f.y}%`}
                         x2={`${t.x}%`}
                         y2={`${t.y}%`}
-                        stroke="rgba(255,255,255,0.08)"
-                        strokeWidth="1"
+                        stroke="rgba(255,255,255,0.28)"
+                        strokeWidth="1.5"
                       />
                     );
                   })}
