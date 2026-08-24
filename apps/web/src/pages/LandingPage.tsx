@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Navbar } from '../components/landing/Navbar';
 import { HeroSection } from '../components/landing/HeroSection';
 import { LogoCloudSection } from '../components/landing/LogoCloudSection';
@@ -15,14 +15,14 @@ import { Footer } from '../components/landing/Footer';
 import { useSmoothScroll, useRevealObserver } from '../components/landing/useScrollReveal';
 import '../styles/landing.css';
 
+import { useTheme } from '../hooks/useTheme';
+
 interface LandingPageProps {
   onNavigate: (route: string) => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
-  const [theme, setTheme] = useState<string>(() => {
-    return localStorage.getItem('hupa-theme') || 'dark';
-  });
+  const [theme, toggleTheme] = useTheme();
 
   // Initialize Lenis smooth scroll
   useSmoothScroll();
@@ -41,15 +41,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
       );
     }
   }, []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('hupa-theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-  };
 
   return (
     <div className="landing-root">

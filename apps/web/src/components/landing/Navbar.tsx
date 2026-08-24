@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Menu, X, ChevronDown } from 'lucide-react';
+import { Menu, X, ChevronDown, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../../hooks/useTheme';
 
 interface NavbarProps {
   onNavigate: (route: string) => void;
@@ -83,7 +84,11 @@ const NAV_CATEGORIES: NavCategory[] = [
   },
 ];
 
-export const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme: propTheme, onToggleTheme }) => {
+  const [internalTheme, toggleInternalTheme] = useTheme();
+  const activeTheme = propTheme || internalTheme;
+  const handleToggleTheme = onToggleTheme || toggleInternalTheme;
+
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -166,9 +171,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme
                     className="land-dropdown-link"
                     onClick={(e) => handleLink(e, item.route)}
                   >
-                    <div style={{ color: '#ffffff', fontWeight: 500 }}>{item.label}</div>
+                    <div style={{ color: 'var(--land-text-hero)', fontWeight: 500 }}>{item.label}</div>
                     {item.desc && (
-                      <div style={{ fontSize: 11, color: 'var(--land-text-3)', marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: 'var(--land-text-4)', marginTop: 2 }}>
                         {item.desc}
                       </div>
                     )}
@@ -205,17 +210,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme
             Sign In
           </button>
 
-          {/* Theme Toggle */}
-          {onToggleTheme && (
-            <button
-              onClick={onToggleTheme}
-              className="land-btn-ghost"
-              aria-label="Toggle theme"
-              style={{ width: 34, height: 34, padding: 0, justifyContent: 'center' }}
-            >
-              {theme === 'dark' ? '☀' : '●'}
-            </button>
-          )}
+          {/* Theme Toggle Button */}
+          <button
+            onClick={handleToggleTheme}
+            className="land-theme-toggle"
+            aria-label={`Switch to ${activeTheme === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Switch to ${activeTheme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {activeTheme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
 
           {/* Get Started */}
           <button
@@ -240,9 +243,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme
 
       {/* Mobile Menu */}
       <div className={`land-mobile-menu ${isMobileOpen ? 'is-open' : ''}`} style={{ overflowY: 'auto', maxHeight: 'calc(100vh - var(--land-header-h))' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid var(--land-border)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--land-text)' }}>Appearance</span>
+          <button
+            onClick={handleToggleTheme}
+            className="land-theme-toggle"
+            aria-label="Toggle Theme"
+          >
+            {activeTheme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+        </div>
+
         {NAV_CATEGORIES.map((cat) => (
           <div key={cat.label} style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--land-text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--land-text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
               {cat.label}
             </div>
             <div style={{ display: 'grid', gap: 6 }}>
@@ -271,3 +285,4 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme
     </header>
   );
 };
+
