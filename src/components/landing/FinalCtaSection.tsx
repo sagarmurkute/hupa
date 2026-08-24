@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { ArrowRight, Download } from 'lucide-react';
-import { gsap, ScrollTrigger } from './useScrollReveal';
+import { gsap } from './useScrollReveal';
 
 interface FinalCtaSectionProps {
   onNavigate: (route: string) => void;

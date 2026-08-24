@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Compass, GitBranch, HardDrive, RefreshCw } from 'lucide-react';
-import { gsap, ScrollTrigger } from './useScrollReveal';
+import { gsap } from './useScrollReveal';
 
 interface FeatureData {
   id: string;
@@ -74,7 +74,6 @@ const FEATURES: FeatureData[] = [
 export const InteractiveProductTabsSection: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const pinnedRef = useRef<HTMLDivElement>(null);
-  const metaPanelsRef = useRef<(HTMLDivElement | null)[]>([]);
   const visualRef = useRef<HTMLDivElement>(null);
   const stepLabelRef = useRef<HTMLDivElement>(null);
   const titleLabelRef = useRef<HTMLHeadingElement>(null);

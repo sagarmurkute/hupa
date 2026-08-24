@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { gsap, ScrollTrigger } from './useScrollReveal';
+import { gsap } from './useScrollReveal';
 
 const PIPELINE_STEPS = [
   { title: 'Source Files', desc: 'Walk directory tree, discover modules, and identify service boundaries', tag: 'Discovery', done: true },
