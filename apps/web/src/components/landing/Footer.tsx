@@ -7,22 +7,28 @@ interface FooterProps {
 
 const FOOTER_COLUMNS = [
   {
-    heading: 'Architecture',
+    heading: 'Product',
     links: [
-      { label: 'Spatial Model', route: '#features' },
-      { label: 'Force Simulation', route: '#features' },
-      { label: 'LOD Culling', route: '#features' },
-      { label: 'Topology Parser', route: '#architecture' },
-      { label: 'Cycle Detection', route: '#architecture' },
+      { label: 'HUPA Studio', route: '/app' },
+      { label: 'Graph Editor', route: '/app' },
+      { label: 'Project Management', route: '/app' },
+      { label: 'Collaboration', route: '/solutions/teams' },
+      { label: 'Import & Export', route: '/app' },
+      { label: 'Templates', route: '/templates' },
+      { label: 'Windows Desktop', route: '/download' },
     ],
   },
   {
-    heading: 'Platform',
+    heading: 'Solutions',
     links: [
-      { label: 'Web Studio', route: '/app' },
-      { label: 'Windows Desktop', route: '/download' },
-      { label: 'Portable Build', route: '/download' },
-      { label: 'File Watcher', route: '#features' },
+      { label: 'Software Projects', route: '/solutions/software-projects' },
+      { label: 'Web Applications', route: '/solutions/web-applications' },
+      { label: 'Mobile Applications', route: '/solutions/mobile-applications' },
+      { label: 'AI Projects', route: '/solutions/ai-projects' },
+      { label: 'APIs & Backend', route: '/solutions/apis-backend' },
+      { label: 'Infrastructure', route: '/solutions/infrastructure' },
+      { label: 'Open Source', route: '/solutions/open-source' },
+      { label: 'Teams', route: '/solutions/teams' },
     ],
   },
   {
@@ -30,18 +36,39 @@ const FOOTER_COLUMNS = [
     links: [
       { label: 'Documentation', route: '/docs' },
       { label: 'Getting Started', route: '/docs?doc=getting-started' },
-      { label: 'Data Schemas', route: '/docs?doc=graph-data-model' },
-      { label: 'Sync Specs', route: '/docs?doc=local-first-and-sync' },
+      { label: 'Architecture Specs', route: '/docs?doc=architecture' },
+      { label: 'Data Model', route: '/docs?doc=graph-data-model' },
+      { label: 'Sync Protocols', route: '/docs?doc=local-first-and-sync' },
+      { label: 'Examples', route: '/examples' },
       { label: 'Changelog', route: 'https://github.com/sagarmurkute/hupa/releases' },
+      { label: 'Blog', route: '/blog' },
+      { label: 'Community', route: 'https://github.com/sagarmurkute/hupa/discussions' },
+      { label: 'Help Center', route: '/help' },
     ],
   },
   {
-    heading: 'Community',
+    heading: 'Developers',
     links: [
-      { label: 'GitHub', route: 'https://github.com/sagarmurkute/hupa' },
-      { label: 'Issues & RFCs', route: 'https://github.com/sagarmurkute/hupa/issues' },
-      { label: 'Discussions', route: 'https://github.com/sagarmurkute/hupa/discussions' },
-      { label: 'MIT License', route: 'https://github.com/sagarmurkute/hupa/blob/main/LICENSE' },
+      { label: 'Developer Docs', route: '/docs?doc=architecture' },
+      { label: 'API Reference', route: '/docs?doc=graph-data-model' },
+      { label: 'Desktop SDK', route: '/docs?doc=desktop-application' },
+      { label: 'CLI Tool', route: '/cli' },
+      { label: 'Integrations', route: '/integrations' },
+      { label: 'Plugins', route: '/plugins' },
+      { label: 'GitHub Repository', route: 'https://github.com/sagarmurkute/hupa' },
+      { label: 'Contributing Guide', route: 'https://github.com/sagarmurkute/hupa/blob/main/CONTRIBUTING.md' },
+      { label: 'Roadmap', route: '/roadmap' },
+    ],
+  },
+  {
+    heading: 'Company',
+    links: [
+      { label: 'About HUPA', route: '/about' },
+      { label: 'Open Source (MIT)', route: 'https://github.com/sagarmurkute/hupa/blob/main/LICENSE' },
+      { label: 'Security Policy', route: '/security' },
+      { label: 'Privacy Policy', route: '/privacy' },
+      { label: 'Terms of Service', route: '/terms' },
+      { label: 'Contact', route: '/contact' },
     ],
   },
 ];
@@ -92,7 +119,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   return (
     <footer ref={footerRef} className="land-footer" role="contentinfo">
       <div className="land-container">
-        <div ref={gridRef} className="land-footer-grid">
+        {/* Sitemap Grid */}
+        <div ref={gridRef} className="land-footer-grid" style={{ gridTemplateColumns: '1.2fr repeat(5, 1fr)', gap: 32 }}>
           {/* Brand Column */}
           <div>
             <div className="land-footer-brand">
@@ -100,7 +128,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <span className="land-footer-brand-text">HUPA</span>
             </div>
             <p className="land-footer-desc">
-              The spatial graph engine for developers. Local-first speed with autonomous cloud sync.
+              The spatial graph engine for software architecture. Local-first speed with autonomous cloud replication.
             </p>
             <div className="land-footer-status">
               <span className="land-footer-status-dot" />
@@ -108,7 +136,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Link Columns */}
+          {/* Categorized Columns */}
           {FOOTER_COLUMNS.map((col) => (
             <div key={col.heading} className="land-footer-col">
               <h4>{col.heading}</h4>
@@ -127,11 +155,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         {/* Bottom bar */}
         <div className="land-footer-bottom">
-          <div>© {new Date().getFullYear()} HUPA Engine. MIT License.</div>
+          <div>© {new Date().getFullYear()} HUPA Engine. Distributed under the MIT License.</div>
           <div className="land-footer-bottom-links">
             <a href="https://github.com/sagarmurkute/hupa" target="_blank" rel="noopener noreferrer">GitHub</a>
             <a href="/docs" onClick={(e) => handleLink(e, '/docs')}>Docs</a>
             <a href="/download" onClick={(e) => handleLink(e, '/download')}>Download</a>
+            <a href="/security" onClick={(e) => handleLink(e, '/security')}>Security</a>
+            <a href="/privacy" onClick={(e) => handleLink(e, '/privacy')}>Privacy</a>
+            <a href="/terms" onClick={(e) => handleLink(e, '/terms')}>Terms</a>
             <a href="/app" onClick={(e) => handleLink(e, '/app')}>Studio</a>
           </div>
         </div>
