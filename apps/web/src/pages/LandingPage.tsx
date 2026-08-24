@@ -1,21 +1,21 @@
 import React, { useEffect } from 'react';
 import { Navbar } from '../components/landing/Navbar';
 import { HeroSection } from '../components/landing/HeroSection';
-import { LogoCloudSection } from '../components/landing/LogoCloudSection';
-import { NeonPillarsSection } from '../components/landing/NeonPillarsSection';
-import { InteractiveProductTabsSection } from '../components/landing/InteractiveProductTabsSection';
-import { DiagramSection } from '../components/landing/DiagramSection';
-import { CodeWorkbenchSection } from '../components/landing/CodeWorkbenchSection';
-import { WhyHupaMatrixSection } from '../components/landing/WhyHupaMatrixSection';
-import { PerformanceCounterSection } from '../components/landing/PerformanceCounterSection';
-import { ReactivitySection } from '../components/landing/ReactivitySection';
-import { TerminalDevExSection } from '../components/landing/TerminalDevExSection';
-import { FinalCtaSection } from '../components/landing/FinalCtaSection';
+import { WhatIsHupaSection } from '../components/landing/WhatIsHupaSection';
+import { ExperienceScrubSection } from '../components/landing/ExperienceScrubSection';
+import { ConnectedEcosystemSection } from '../components/landing/ConnectedEcosystemSection';
+import { UniversalProjectsSection } from '../components/landing/UniversalProjectsSection';
+import { CinematicZoomSection } from '../components/landing/CinematicZoomSection';
+import { StudioShowcaseSection } from '../components/landing/StudioShowcaseSection';
+import { LocalFirstSection } from '../components/landing/LocalFirstSection';
+import { CrossPlatformSection } from '../components/landing/CrossPlatformSection';
+import { OpenSourceSection } from '../components/landing/OpenSourceSection';
+import { OnboardingFlowSection } from '../components/landing/OnboardingFlowSection';
+import { FinalConvergenceSection } from '../components/landing/FinalConvergenceSection';
 import { Footer } from '../components/landing/Footer';
 import { useSmoothScroll, useRevealObserver } from '../components/landing/useScrollReveal';
-import '../styles/landing.css';
-
 import { useTheme } from '../hooks/useTheme';
+import '../styles/landing.css';
 
 interface LandingPageProps {
   onNavigate: (route: string) => void;
@@ -27,17 +27,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   // Initialize Lenis smooth scroll
   useSmoothScroll();
 
-  // Fallback reveal observer for elements not managed by GSAP
+  // Fallback reveal observer for scroll elements
   useRevealObserver();
 
   useEffect(() => {
-    document.title = 'HUPA — The Spatial Graph Engine for Developers';
+    document.title = 'HUPA — See Your Entire Project as a Spatial System';
 
     // Set meta description
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
       metaDesc.setAttribute('content',
-        'Model, understand, and navigate complex software systems as one connected spatial graph. Local-first, offline-capable, open source.'
+        'HUPA turns complex software architectures into an interactive visual system you can explore, understand, and manage. Local-first, offline-capable, open source.'
       );
     }
   }, []);
@@ -48,46 +48,49 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         Skip to content
       </a>
 
-      {/* 1. Sticky Glass Header */}
+      {/* Sticky Header with Navigation Dropdowns & Theme Toggle */}
       <Navbar onNavigate={onNavigate} theme={theme} onToggleTheme={toggleTheme} />
 
-      {/* Main Content — Scroll Storytelling */}
+      {/* Main Content — 12 Cinematic Storytelling Sections */}
       <main id="main">
-        {/* 2. Hero — Cinematic opening, graph assembles */}
+        {/* 1. HERO — "See your entire project." & progressive graph assembly */}
         <HeroSection onNavigate={onNavigate} />
 
-        {/* 3. Trust Bar — Tech stack marquee */}
-        <LogoCloudSection />
+        {/* 2. WHAT IS HUPA? — "Your project isn't a folder. It's a system." */}
+        <WhatIsHupaSection />
 
-        {/* 4. Architecture Pillars — 4 capabilities */}
-        <NeonPillarsSection />
+        {/* 3. THE HUPA EXPERIENCE — Pinned 4-stage scrub: Explore → Connect → Understand → Organize */}
+        <ExperienceScrubSection />
 
-        {/* 5. Feature Showcase — Pinned scroll section */}
-        <InteractiveProductTabsSection />
+        {/* 4. EVERYTHING IS CONNECTED — Project → Systems → Components → Services → Dependencies → Resources */}
+        <ConnectedEcosystemSection />
 
-        {/* 6. Reactivity — Live state demo */}
-        <ReactivitySection />
+        {/* 5. BUILT FOR EVERY PROJECT — "One system for every kind of project." (Web, Mobile, AI, Backend, Infra, OSS, Teams) */}
+        <UniversalProjectsSection />
 
-        {/* 7. Pipeline Diagram — Animated data flow */}
-        <DiagramSection />
+        {/* 6. GO DEEPER — Signature cinematic spatial zoom from Macro to Micro */}
+        <CinematicZoomSection />
 
-        {/* 8. Code Workbench — Architecture specs */}
-        <CodeWorkbenchSection />
+        {/* 7. THE ACTUAL HUPA STUDIO — Real product UI: Canvas, Nodes, Inspector, Sidebar, Minimap */}
+        <StudioShowcaseSection onNavigate={onNavigate} />
 
-        {/* 9. Comparison — Why HUPA */}
-        <WhyHupaMatrixSection />
+        {/* 8. LOCAL FIRST — "Your project stays with you." (Local → Offline → Sync → Cloud) */}
+        <LocalFirstSection />
 
-        {/* 10. Performance — Animated counters */}
-        <PerformanceCounterSection />
+        {/* 9. WEB + DESKTOP — "Work wherever your project lives." (Web + Windows Desktop) */}
+        <CrossPlatformSection onNavigate={onNavigate} />
 
-        {/* 11. Terminal — Getting started */}
-        <TerminalDevExSection />
+        {/* 10. OPEN SOURCE — Built in the open (MIT, GitHub, Community) */}
+        <OpenSourceSection />
 
-        {/* 12. Final CTA — Convergent */}
-        <FinalCtaSection onNavigate={onNavigate} />
+        {/* 11. GET STARTED — 01 to 04 onboarding sequence */}
+        <OnboardingFlowSection onNavigate={onNavigate} />
+
+        {/* 12. FINAL EXPERIENCE — Grand graph convergence & "Understand your whole project." */}
+        <FinalConvergenceSection onNavigate={onNavigate} />
       </main>
 
-      {/* 13. Footer — End of experience */}
+      {/* Complete Footer Sitemap */}
       <Footer onNavigate={onNavigate} />
     </div>
   );
