@@ -1,10 +1,55 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { gsap } from './useScrollReveal';
 
 interface FooterProps {
   onNavigate: (route: string) => void;
 }
 
+const FOOTER_COLUMNS = [
+  {
+    heading: 'Architecture',
+    links: [
+      { label: 'Spatial Model', route: '#features' },
+      { label: 'Force Simulation', route: '#features' },
+      { label: 'LOD Culling', route: '#features' },
+      { label: 'Topology Parser', route: '#architecture' },
+      { label: 'Cycle Detection', route: '#architecture' },
+    ],
+  },
+  {
+    heading: 'Platform',
+    links: [
+      { label: 'Web Studio', route: '/app' },
+      { label: 'Windows Desktop', route: '/download' },
+      { label: 'Portable Build', route: '/download' },
+      { label: 'File Watcher', route: '#features' },
+    ],
+  },
+  {
+    heading: 'Resources',
+    links: [
+      { label: 'Documentation', route: '/docs' },
+      { label: 'Getting Started', route: '/docs?doc=getting-started' },
+      { label: 'Data Schemas', route: '/docs?doc=graph-data-model' },
+      { label: 'Sync Specs', route: '/docs?doc=local-first-and-sync' },
+      { label: 'Changelog', route: 'https://github.com/sagarmurkute/hupa/releases' },
+    ],
+  },
+  {
+    heading: 'Community',
+    links: [
+      { label: 'GitHub', route: 'https://github.com/sagarmurkute/hupa' },
+      { label: 'Issues & RFCs', route: 'https://github.com/sagarmurkute/hupa/issues' },
+      { label: 'Discussions', route: 'https://github.com/sagarmurkute/hupa/discussions' },
+      { label: 'MIT License', route: 'https://github.com/sagarmurkute/hupa/blob/main/LICENSE' },
+    ],
+  },
+];
+
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+  const footerRef = useRef<HTMLElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
   const handleLink = (e: React.MouseEvent, route: string) => {
     e.preventDefault();
     if (route.startsWith('#')) {
@@ -18,70 +63,54 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     onNavigate(route);
   };
 
-  const FOOTER_COLUMNS = [
-    {
-      heading: 'Architecture',
-      links: [
-        { label: 'Spatial Model', route: '#features' },
-        { label: 'Force Simulation', route: '#features' },
-        { label: 'LOD Culling', route: '#features' },
-        { label: 'Topology Parser', route: '#diagram' },
-        { label: 'Cycle WASM', route: '#diagram' },
-      ],
-    },
-    {
-      heading: 'Platform',
-      links: [
-        { label: 'Web Studio', route: '/app' },
-        { label: 'Windows Desktop', route: '/download' },
-        { label: 'Portable Build', route: '/download' },
-        { label: 'Electron 43', route: '/download' },
-        { label: 'File Watcher', route: '#features' },
-      ],
-    },
-    {
-      heading: 'Resources',
-      links: [
-        { label: 'Documentation', route: '/docs' },
-        { label: 'Getting Started', route: '/docs?doc=getting-started' },
-        { label: 'Data Schemas', route: '/docs?doc=graph-data-model' },
-        { label: 'Sync Specs', route: '/docs?doc=local-first-and-sync' },
-        { label: 'Changelog', route: 'https://github.com/sagarmurkute/hupa/releases' },
-      ],
-    },
-    {
-      heading: 'Community',
-      links: [
-        { label: 'GitHub', route: 'https://github.com/sagarmurkute/hupa' },
-        { label: 'Issues & RFCs', route: 'https://github.com/sagarmurkute/hupa/issues' },
-        { label: 'Discussions', route: 'https://github.com/sagarmurkute/hupa/discussions' },
-        { label: 'MIT License', route: 'https://github.com/sagarmurkute/hupa/blob/main/LICENSE' },
-      ],
-    },
-  ];
+  useEffect(() => {
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) return;
+
+    const ctx = gsap.context(() => {
+      if (gridRef.current) {
+        const cols = gridRef.current.children;
+        gsap.fromTo(cols,
+          { opacity: 0, y: 24 },
+          {
+            opacity: 1, y: 0,
+            duration: 0.6,
+            stagger: 0.08,
+            ease: 'power3.out',
+            scrollTrigger: {
+              trigger: gridRef.current,
+              start: 'top 90%',
+            },
+          }
+        );
+      }
+    }, footerRef);
+
+    return () => ctx.revert();
+  }, []);
 
   return (
-    <footer className="neon-footer" role="contentinfo">
-      <div className="container">
-        <div className="neon-footer-grid">
-          {/* Brand Col */}
+    <footer ref={footerRef} className="land-footer" role="contentinfo">
+      <div className="land-container">
+        <div ref={gridRef} className="land-footer-grid">
+          {/* Brand Column */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <div className="brand-icon-neon">H</div>
-              <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-white)' }}>HUPA</span>
+            <div className="land-footer-brand">
+              <div className="land-brand-mark">H</div>
+              <span className="land-footer-brand-text">HUPA</span>
             </div>
-            <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '0 0 20px', lineHeight: 1.6, maxWidth: '28ch' }}>
-              The Universal Spatial Graph Engine for Developers. Local-first speed with autonomous cloud sync.
+            <p className="land-footer-desc">
+              The spatial graph engine for developers. Local-first speed with autonomous cloud sync.
             </p>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'var(--neon-surface)', border: '1px solid var(--neon-border)', borderRadius: 20, fontSize: 12, color: 'var(--neon-green-text)', fontFamily: 'var(--mono)' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--neon-green)' }} />
+            <div className="land-footer-status">
+              <span className="land-footer-status-dot" />
               <span>All Systems Operational</span>
             </div>
           </div>
 
-          {/* Links Cols */}
+          {/* Link Columns */}
           {FOOTER_COLUMNS.map((col) => (
-            <div key={col.heading} className="neon-footer-col">
+            <div key={col.heading} className="land-footer-col">
               <h4>{col.heading}</h4>
               <ul>
                 {col.links.map((link) => (
@@ -96,14 +125,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           ))}
         </div>
 
-        {/* Footer Bottom Bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 28, fontSize: 13, color: 'var(--text-dim)', flexWrap: 'wrap', gap: 16 }}>
-          <div>© {new Date().getFullYear()} HUPA Engine. Released under the MIT License.</div>
-          <div style={{ display: 'flex', gap: 20 }}>
-            <a href="https://github.com/sagarmurkute/hupa" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>GitHub</a>
-            <a href="/docs" onClick={(e) => handleLink(e, '/docs')} style={{ color: 'var(--text-muted)' }}>Docs</a>
-            <a href="/download" onClick={(e) => handleLink(e, '/download')} style={{ color: 'var(--text-muted)' }}>Download</a>
-            <a href="/app" onClick={(e) => handleLink(e, '/app')} style={{ color: 'var(--text-muted)' }}>Studio</a>
+        {/* Bottom bar */}
+        <div className="land-footer-bottom">
+          <div>© {new Date().getFullYear()} HUPA Engine. MIT License.</div>
+          <div className="land-footer-bottom-links">
+            <a href="https://github.com/sagarmurkute/hupa" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="/docs" onClick={(e) => handleLink(e, '/docs')}>Docs</a>
+            <a href="/download" onClick={(e) => handleLink(e, '/download')}>Download</a>
+            <a href="/app" onClick={(e) => handleLink(e, '/app')}>Studio</a>
           </div>
         </div>
       </div>
